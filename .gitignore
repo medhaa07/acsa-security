@@ -48,6 +48,7 @@ htmlcov/
 
 # ACSA Runtime Workspace & Logs (Security boundary: isolated runtime workspaces are ignored)
 .acsa_workspaces/
+.acsa_cache/
 *.log
 .env
 .env.*

@@ -49,6 +49,34 @@ class Settings(BaseSettings):
         description="Security constraint: never blindly run npm install or lifecycle scripts",
     )
 
+    # OSV Vulnerability Intelligence & Caching
+    osv_api_base_url: str = Field(
+        default="https://api.osv.dev/v1",
+        description="OSV REST API base URL (configurable for test mocks)",
+    )
+    osv_timeout_seconds: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=120.0,
+        description="OSV HTTP client timeout in seconds",
+    )
+    osv_max_retries: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Maximum retries for transient HTTP errors",
+    )
+    osv_batch_size: int = Field(
+        default=100,
+        ge=1,
+        le=1000,
+        description="Maximum items per OSV querybatch request",
+    )
+    cache_dir: Path = Field(
+        default=Path(".acsa_cache"),
+        description="Base directory for local intelligence cache",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

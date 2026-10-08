@@ -58,7 +58,7 @@ def status() -> None:
 
     table.add_row("Phase 0", "Engineering Foundation, Domain Models & CLI", "[bold green]Ready[/bold green]")
     table.add_row("Phase 1", "Ingestion (manifest, lockfile, SBOM)", "[bold green]Ready[/bold green]")
-    table.add_row("Phase 2", "Inventory Truth + OSV Advisory Matching", "[yellow]Planned[/yellow]")
+    table.add_row("Phase 2", "Inventory Truth + OSV Advisory Matching", "[bold green]Ready[/bold green]")
     table.add_row("Phase 3", "Reachability (AST, Import/Call Graph)", "[yellow]Planned[/yellow]")
     table.add_row("Phase 4", "Context & Multi-Source Evidence Fusion", "[yellow]Planned[/yellow]")
 
@@ -148,6 +148,117 @@ def ingest(
             console.print(f"  [red][ERROR][/red] [{e.artifact_path}] {e.message}")
 
     console.print("\n[dim]Phase 1 Ingestion complete. No external vulnerability queries executed.[/dim]")
+
+
+@app.command(name="scan")
+def scan(
+    repository_path: Annotated[
+        str,
+        typer.Argument(help="Path to the repository workspace to scan."),
+    ],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output machine-readable JSON scan results."),
+    ] = False,
+) -> None:
+    """Scan repository artifacts and evaluate exact-version vulnerability applicability via OSV."""
+    from pathlib import Path
+
+    from acsa.ingestion.service import IngestionService
+    from acsa.vulnerability.models import ApplicabilityStatus
+    from acsa.vulnerability.service import VulnerabilityService
+
+    ingest_service = IngestionService()
+    ingest_result = ingest_service.ingest_repository(Path(repository_path))
+
+    vuln_service = VulnerabilityService()
+    scan_result = vuln_service.scan_inventory(
+        ingest_result.inventory, repository_path=str(repository_path)
+    )
+
+    if json_output:
+        console.print_json(scan_result.model_dump_json(indent=2))
+        return
+
+    console.print(
+        f"\n[bold blue]ACSA Security Analysis[/bold blue] for: [cyan]{scan_result.repository_path}[/cyan]\n"
+    )
+
+    # Inventory section
+    inv_table = Table(title="Inventory Truth Summary")
+    inv_table.add_column("Metric", style="cyan")
+    inv_table.add_column("Count", justify="right", style="bold white")
+    inv_table.add_row("Artifacts Discovered", str(len(ingest_result.discovered_artifacts)))
+    inv_table.add_row("Total Observations", str(len(scan_result.inventory.observations)))
+    inv_table.add_row("Unique Components", str(len(scan_result.inventory.unique_component_names)))
+    inv_table.add_row("Exact Versions Queried", str(scan_result.exact_versions_queried))
+    console.print(inv_table)
+
+    # Intelligence summary
+    intel_table = Table(title="Vulnerability Intelligence Summary (OSV)")
+    intel_table.add_column("Metric", style="magenta")
+    unique_affected_versions = {
+        (f.component.name, f.component.version)
+        for f in scan_result.findings
+        if f.applicability_status == ApplicabilityStatus.AFFECTED
+    }
+    intel_table.add_row("OSV Queries Sent", str(scan_result.queries_executed))
+    intel_table.add_row("Advisories Evaluated", str(scan_result.advisories_count))
+    intel_table.add_row(
+        "Affected Advisory Findings",
+        str(scan_result.affected_count),
+        style="bold red" if scan_result.affected_count else "green",
+    )
+    intel_table.add_row(
+        "Affected Exact Versions",
+        str(len(unique_affected_versions)),
+        style="bold red" if unique_affected_versions else "green",
+    )
+    intel_table.add_row("Not Affected", str(scan_result.not_affected_count))
+    intel_table.add_row("Unknown / Ambiguous", str(scan_result.unknown_count))
+    console.print(intel_table)
+
+    if not scan_result.osv_available:
+        console.print("\n[bold red][ERROR] OSV intelligence service was unavailable during scan.[/bold red]")
+        for err in scan_result.errors:
+            console.print(f"  [red]- {err}[/red]")
+        return
+
+    # Findings table
+    if scan_result.findings:
+        find_table = Table(title=f"Evidence-Backed Findings ({len(scan_result.findings)})")
+        find_table.add_column("Advisory ID", style="bold yellow")
+        find_table.add_column("Package", style="cyan")
+        find_table.add_column("Version", style="white")
+        find_table.add_column("Status", style="bold")
+        find_table.add_column("Fixed In", style="green")
+        find_table.add_column("Severity", style="magenta")
+        find_table.add_column("Source Artifact", style="dim")
+
+        for f in scan_result.findings:
+            if f.applicability_status == ApplicabilityStatus.AFFECTED:
+                status_str = "[bold red]AFFECTED[/bold red]"
+            elif f.applicability_status == ApplicabilityStatus.NOT_AFFECTED:
+                status_str = "[bold green]NOT_AFFECTED[/bold green]"
+            else:
+                status_str = "[bold yellow]UNKNOWN[/bold yellow]"
+
+            find_table.add_row(
+                f.vulnerability.id,
+                f.component.name,
+                f.component.version or "-",
+                status_str,
+                ", ".join(f.vulnerability.fixed_versions) if f.vulnerability.fixed_versions else "-",
+                f.vulnerability.severity or "-",
+                f.source_artifact_path or "-",
+            )
+        console.print(find_table)
+    else:
+        console.print("\n[bold green][OK] No vulnerabilities reported for exact installed package versions.[/bold green]")
+
+    console.print(
+        "\n[dim]Phase 2 Vulnerability Intelligence complete. Reachability & exploitability will be evaluated in Phase 3.[/dim]"
+    )
 
 
 @app.command(name="plan")
