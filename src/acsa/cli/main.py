@@ -59,7 +59,7 @@ def status() -> None:
     table.add_row("Phase 0", "Engineering Foundation, Domain Models & CLI", "[bold green]Ready[/bold green]")
     table.add_row("Phase 1", "Ingestion (manifest, lockfile, SBOM)", "[bold green]Ready[/bold green]")
     table.add_row("Phase 2", "Inventory Truth + OSV Advisory Matching", "[bold green]Ready[/bold green]")
-    table.add_row("Phase 3", "Reachability (AST, Import/Call Graph)", "[yellow]Planned[/yellow]")
+    table.add_row("Phase 3", "Reachability (AST, Import/Call Graph)", "[bold green]Ready[/bold green]")
     table.add_row("Phase 4", "Context & Multi-Source Evidence Fusion", "[yellow]Planned[/yellow]")
 
     console.print(table)
@@ -161,10 +161,12 @@ def scan(
         typer.Option("--json", help="Output machine-readable JSON scan results."),
     ] = False,
 ) -> None:
-    """Scan repository artifacts and evaluate exact-version vulnerability applicability via OSV."""
+    """Scan repository artifacts, evaluate exact-version vulnerability applicability via OSV, and compute static reachability."""
     from pathlib import Path
 
     from acsa.ingestion.service import IngestionService
+    from acsa.reachability.models import ReachabilityState
+    from acsa.reachability.service import ReachabilityService
     from acsa.vulnerability.models import ApplicabilityStatus
     from acsa.vulnerability.service import VulnerabilityService
 
@@ -175,6 +177,9 @@ def scan(
     scan_result = vuln_service.scan_inventory(
         ingest_result.inventory, repository_path=str(repository_path)
     )
+
+    reach_service = ReachabilityService()
+    scan_result = reach_service.enrich_scan_result(scan_result, repository_path=Path(repository_path))
 
     if json_output:
         console.print_json(scan_result.model_dump_json(indent=2))
@@ -224,17 +229,28 @@ def scan(
             console.print(f"  [red]- {err}[/red]")
         return
 
-    # Findings table
-    if scan_result.findings:
-        find_table = Table(title=f"Evidence-Backed Findings ({len(scan_result.findings)})")
-        find_table.add_column("Advisory ID", style="bold yellow")
-        find_table.add_column("Package", style="cyan")
-        find_table.add_column("Version", style="white")
-        find_table.add_column("Status", style="bold")
-        find_table.add_column("Fixed In", style="green")
-        find_table.add_column("Severity", style="magenta")
-        find_table.add_column("Source Artifact", style="dim")
+    # Reachability summary
+    reachable_count = sum(
+        1 for f in scan_result.findings if f.reachability and f.reachability.status == ReachabilityState.REACHABLE
+    )
+    not_reachable_count = sum(
+        1 for f in scan_result.findings if f.reachability and f.reachability.status == ReachabilityState.NOT_REACHABLE
+    )
+    reach_unknown_count = sum(
+        1 for f in scan_result.findings if f.reachability and f.reachability.status == ReachabilityState.UNKNOWN
+    )
 
+    reach_table = Table(title="Reachability Analysis Summary (AST & Call Graph)")
+    reach_table.add_column("Reachability State", style="cyan")
+    reach_table.add_column("Findings Count", justify="right", style="bold")
+    reach_table.add_row("REACHABLE", str(reachable_count), style="bold red" if reachable_count else "dim")
+    reach_table.add_row("NOT_REACHABLE", str(not_reachable_count), style="bold green" if not_reachable_count else "dim")
+    reach_table.add_row("UNKNOWN (Preserved Uncertainty)", str(reach_unknown_count), style="bold yellow" if reach_unknown_count else "dim")
+    console.print(reach_table)
+
+    # Detailed Findings with Reachability
+    if scan_result.findings:
+        console.print(f"\n[bold white]Detailed Findings & Exposure Paths ({len(scan_result.findings)}):[/bold white]")
         for f in scan_result.findings:
             if f.applicability_status == ApplicabilityStatus.AFFECTED:
                 status_str = "[bold red]AFFECTED[/bold red]"
@@ -243,21 +259,38 @@ def scan(
             else:
                 status_str = "[bold yellow]UNKNOWN[/bold yellow]"
 
-            find_table.add_row(
-                f.vulnerability.id,
-                f.component.name,
-                f.component.version or "-",
-                status_str,
-                ", ".join(f.vulnerability.fixed_versions) if f.vulnerability.fixed_versions else "-",
-                f.vulnerability.severity or "-",
-                f.source_artifact_path or "-",
-            )
-        console.print(find_table)
+            console.print("\n" + "-" * 60)
+            console.print(f"[bold yellow]{f.vulnerability.id}[/bold yellow] ({f.vulnerability.severity or 'SEVERITY N/A'})")
+            console.print(f"Package: [cyan]{f.component.name}@{f.component.version or '-'}[/cyan]")
+            console.print(f"Status: {status_str}")
+
+            if f.reachability:
+                console.print("\nReachability:")
+                if f.reachability.status == ReachabilityState.REACHABLE:
+                    console.print("  Status: [bold red]REACHABLE[/bold red]")
+                    if f.reachability.entry_point:
+                        console.print(f"  Entry point: [cyan]{f.reachability.entry_point}[/cyan]")
+                    if f.reachability.target_symbol:
+                        console.print(f"  Vulnerable symbol: [bold magenta]{f.reachability.target_symbol}[/bold magenta]")
+                    if f.reachability.evidence_path:
+                        console.print("  Evidence path:")
+                        for idx, step in enumerate(f.reachability.evidence_path):
+                            if idx == 0:
+                                console.print(f"    {step}")
+                            else:
+                                console.print(f"    [dim]->[/dim] {step}")
+                elif f.reachability.status == ReachabilityState.NOT_REACHABLE:
+                    console.print("  Status: [bold green]NOT_REACHABLE[/bold green]")
+                else:
+                    console.print("  Status: [bold yellow]UNKNOWN[/bold yellow]")
+                    if f.reachability.uncertainty_reason:
+                        console.print(f"  Reason: [yellow]{f.reachability.uncertainty_reason}[/yellow]")
+        console.print("-" * 60)
     else:
         console.print("\n[bold green][OK] No vulnerabilities reported for exact installed package versions.[/bold green]")
 
     console.print(
-        "\n[dim]Phase 2 Vulnerability Intelligence complete. Reachability & exploitability will be evaluated in Phase 3.[/dim]"
+        "\n[dim]Phase 3 Reachability Analysis complete. Attacker-controlled data flow will be evaluated in Phase 4.[/dim]"
     )
 
 

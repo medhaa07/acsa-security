@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from acsa.core.exceptions import PathTraversalError
 from acsa.core.path_security import validate_safe_path
 from acsa.ingestion.service import IngestionService
+from acsa.reachability.service import ReachabilityService
 from acsa.vulnerability.models import VulnerabilityScanResult
 from acsa.vulnerability.service import VulnerabilityService
 
@@ -61,4 +62,9 @@ async def scan_repository(request: ScanRequest) -> VulnerabilityScanResult:
     scan_result = vuln_service.scan_inventory(
         ingest_result.inventory, repository_path=str(resolved_path)
     )
-    return scan_result
+
+    reachability_service = ReachabilityService()
+    enriched_result = reachability_service.enrich_scan_result(
+        scan_result, repository_path=resolved_path
+    )
+    return enriched_result
