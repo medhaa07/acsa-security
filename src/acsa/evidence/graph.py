@@ -118,6 +118,10 @@ class EvidenceGraph(BaseModel):
         canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
+    def compute_deterministic_digest(self) -> str:
+        """Alias for digest() for deterministic cryptographic fingerprinting."""
+        return self.digest()
+
     @property
     def node_count(self) -> int:
         """Return the total number of nodes."""

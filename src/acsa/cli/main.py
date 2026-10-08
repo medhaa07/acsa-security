@@ -577,6 +577,114 @@ def remediate(
     _render_remediation_section(rem_report)
 
 
+@app.command(name="verify-remediation")
+def verify_remediation_command(
+    repository_path: str = typer.Argument(
+        ...,
+        help="Path to repository workspace to verify remediation candidates against",
+    ),
+    candidate: str | None = typer.Option(
+        None,
+        "--candidate",
+        "-c",
+        help="Optional specific candidate ID to verify",
+    ),
+    mode: str = typer.Option(
+        "simulated",
+        "--mode",
+        "-m",
+        help="Verification mode: 'simulated' (Mode A) or 'materialized' (Mode B)",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Render output in machine-readable JSON format",
+    ),
+) -> None:
+    """Verify remediation candidates in an isolated workspace and generate Proof-Carrying Remediation evidence."""
+    from pathlib import Path
+
+    from acsa.core.exceptions import PathTraversalError
+    from acsa.core.path_security import validate_safe_path
+    from acsa.proof.models import VerificationMode
+    from acsa.proof.report import ProofReportGenerator
+    from acsa.proof.service import RemediationProofService
+
+    target_path = Path(repository_path)
+    try:
+        resolved_path = validate_safe_path(target_path, target_path)
+    except PathTraversalError as err:
+        console.print(f"[bold red]Path security violation:[/bold red] {err}")
+        return
+    except Exception as err:
+        console.print(f"[bold red]Invalid repository path:[/bold red] {err}")
+        return
+
+    if not resolved_path.exists() or not resolved_path.is_dir():
+        console.print(
+            f"[bold red]Repository workspace directory not found:[/bold red] '{repository_path}'"
+        )
+        return
+
+    verif_mode = (
+        VerificationMode.MODE_B_MATERIALIZED
+        if mode.lower() in ("materialized", "mode_b", "mode_b_materialized")
+        else VerificationMode.MODE_A_SIMULATED
+    )
+
+    proof_report = RemediationProofService.verify_repository(
+        repository_path=resolved_path,
+        mode=verif_mode,
+        candidate_id=candidate,
+    )
+
+    if json_output:
+        console.print_json(proof_report.model_dump_json(indent=2))
+        return
+
+    console.print("\n" + "=" * 60)
+    console.print("[bold green]ACSA PROOF-CARRYING REMEDIATION VERIFICATION[/bold green]")
+    console.print("=" * 60)
+    console.print(f"Repository: [cyan]{proof_report.repository_path}[/cyan]")
+    console.print(f"Mode: [bold]{proof_report.verification_mode.value}[/bold]")
+    console.print(f"Candidates Evaluated: [bold]{proof_report.total_candidates_verified}[/bold]")
+
+    if not proof_report.results:
+        console.print("\n[dim]No candidate remediations evaluated.[/dim]")
+        return
+
+    for proof in proof_report.results:
+        console.print("\n" + ProofReportGenerator.format_text_report(proof))
+
+    # Summary table
+    table = Table(title="Remediation Proof Verdicts Summary")
+    table.add_column("Verdict State", style="cyan")
+    table.add_column("Count", justify="right", style="bold")
+    table.add_row(
+        "PROVEN_REMEDIATED",
+        str(proof_report.proven_remediated_count),
+        style="bold green" if proof_report.proven_remediated_count else "dim",
+    )
+    table.add_row(
+        "REQUIRES_VERIFICATION",
+        str(proof_report.requires_verification_count),
+        style="bold yellow" if proof_report.requires_verification_count else "dim",
+    )
+    table.add_row(
+        "PARTIALLY_VERIFIED",
+        str(proof_report.partially_verified_count),
+        style="bold yellow" if proof_report.partially_verified_count else "dim",
+    )
+    table.add_row(
+        "REMEDIATION_FAILED",
+        str(proof_report.failed_count),
+        style="bold red" if proof_report.failed_count else "dim",
+    )
+    console.print("\n")
+    console.print(table)
+
+
 @app.command(name="plan")
 def pipeline_plan() -> None:
     """Display the end-to-end evidence pipeline roadmap and novelty capabilities."""
