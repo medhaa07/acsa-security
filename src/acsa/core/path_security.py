@@ -24,9 +24,12 @@ def validate_safe_path(base_dir: Path | str, target_path: Path | str) -> Path:
     if "\x00" in raw_str:
         raise PathTraversalError("Null byte detected in path")
 
-    target_resolved = (
-        target.resolve() if target.is_absolute() else (base_resolved / target).resolve()
-    )
+    if target.resolve() == base_resolved:
+        target_resolved = base_resolved
+    elif target.is_absolute():
+        target_resolved = target.resolve()
+    else:
+        target_resolved = (base_resolved / target).resolve()
 
     try:
         # Check if target_resolved is relative to base_resolved
