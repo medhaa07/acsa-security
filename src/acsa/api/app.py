@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from acsa.api.routes.health import router as health_router
 from acsa.api.routes.ingest import router as ingest_router
+from acsa.api.routes.remediate import router as remediate_router
 from acsa.api.routes.scan import router as scan_router
 from acsa.core.config import get_settings
 from acsa.core.logging import setup_logging
@@ -52,6 +53,10 @@ def create_app() -> FastAPI:
     # Scanning & Intelligence endpoints
     app.include_router(scan_router)
     app.include_router(scan_router, prefix="/api/v1")
+
+    # Remediation endpoints
+    app.include_router(remediate_router)
+    app.include_router(remediate_router, prefix="/api/v1")
 
     return app
 

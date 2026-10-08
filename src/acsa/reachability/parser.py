@@ -616,11 +616,12 @@ class JavaScriptSourceParser:
             route_path = route_literal.strip("'\"") if route_literal else "/"
             line = self._offset_to_line(text, m.start())
 
+            entry_type = "middleware" if method == "USE" else "route"
             name = f"{method} {route_path} ({obj})"
             entry_points.append(
                 EntryPoint(
                     name=name,
-                    entry_type="route",
+                    entry_type=entry_type,
                     location=SourceLocation(file_path=file_path, line_number=line),
                     handler_symbol=None,
                 )

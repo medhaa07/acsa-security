@@ -1,4 +1,4 @@
-"""API route for repository vulnerability scanning and exact version applicability."""
+"""API route for Minimum-Blast-Radius remediation candidate generation."""
 
 from pathlib import Path
 
@@ -10,15 +10,16 @@ from acsa.core.exceptions import PathTraversalError
 from acsa.core.path_security import validate_safe_path
 from acsa.ingestion.service import IngestionService
 from acsa.reachability.service import ReachabilityService
+from acsa.remediation.models import RemediationReport
+from acsa.remediation.service import RemediationService
 from acsa.verdict.service import EvidenceFusionService
-from acsa.vulnerability.models import VulnerabilityScanResult
 from acsa.vulnerability.service import VulnerabilityService
 
-router = APIRouter(tags=["Vulnerability Scanning"])
+router = APIRouter(tags=["Remediation Analysis"])
 
 
-class ScanRequest(BaseModel):
-    """Request payload to initiate vulnerability scanning for a repository workspace."""
+class RemediateRequest(BaseModel):
+    """Request payload to initiate minimum-blast-radius remediation analysis."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -28,16 +29,16 @@ class ScanRequest(BaseModel):
 
 
 @router.post(
-    "/scan",
-    response_model=VulnerabilityScanResult,
+    "/remediate",
+    response_model=RemediationReport,
     status_code=status.HTTP_200_OK,
-    summary="Scan repository artifacts for exact-version vulnerability applicability via OSV, reachability, context, and verdicts",
+    summary="Generate Minimum-Blast-Radius remediation candidates and simulated patches for repository findings",
 )
-async def scan_repository(request: ScanRequest) -> VulnerabilityScanResult:
-    """Perform artifact ingestion, OSV intelligence matching, reachability, context data flow, and evidence fusion."""
+async def remediate_repository(request: RemediateRequest) -> RemediationReport:
+    """Analyze repository findings, determine dependency relations, select minimum safe versions, and simulate patches."""
     target_path = Path(request.repository_path)
 
-    # Enforce Phase 0 path security boundary: prevent path traversal and arbitrary filesystem escapes
+    # Path traversal validation
     try:
         resolved_path = validate_safe_path(target_path, target_path)
     except PathTraversalError as err:
@@ -57,42 +58,43 @@ async def scan_repository(request: ScanRequest) -> VulnerabilityScanResult:
             detail=f"Repository workspace directory not found: '{request.repository_path}'",
         )
 
-    # 1. Artifact Ingestion
+    # 1. Ingestion
     ingest_service = IngestionService()
     ingest_result = ingest_service.ingest_repository(resolved_path)
 
-    # 2. OSV Vulnerability Intelligence
+    # 2. OSV Intelligence
     vuln_service = VulnerabilityService()
     scan_result = vuln_service.scan_inventory(
         ingest_result.inventory, repository_path=str(resolved_path)
     )
 
-    # 3. Static Reachability Analysis
-    reachability_service = ReachabilityService()
-    findings_reach, reach_evidence, graph = reachability_service.analyze_findings(
-        repository_path=resolved_path,
-        findings=scan_result.findings,
+    # 3. Static Reachability
+    reach_service = ReachabilityService()
+    findings_reach, reach_ev, graph = reach_service.analyze_findings(
+        resolved_path, scan_result.findings
     )
 
-    # 4. Context & Attacker-Controlled Data Flow Analysis
-    context_service = ContextService()
-    findings_ctx, ctx_evidence = context_service.analyze_findings(
-        repository_path=resolved_path,
-        findings=findings_reach,
-        graph=graph,
+    # 4. Context & Attacker-Controlled Data Flow
+    ctx_service = ContextService()
+    findings_ctx, ctx_ev = ctx_service.analyze_findings(
+        resolved_path, findings_reach, graph=graph
     )
 
-    # Intermediate model with combined evidence
     intermediate_result = scan_result.model_copy(
         update={
             "findings": findings_ctx,
-            "evidence": list(scan_result.evidence) + reach_evidence + ctx_evidence,
+            "evidence": list(scan_result.evidence) + reach_ev + ctx_ev,
             "reachability_evaluated": True,
             "context_evaluated": True,
         }
     )
 
-    # 5. Multi-Source Evidence Fusion & Verdict Determination
+    # 5. Evidence Fusion & Verdicts
     fusion_service = EvidenceFusionService()
     final_result = fusion_service.enrich_scan_result(intermediate_result, graph=graph)
-    return final_result
+
+    # 6. Minimum-Blast-Radius Remediation Analysis
+    rem_service = RemediationService()
+    rem_report = rem_service.remediate_repository(resolved_path, final_result)
+
+    return rem_report

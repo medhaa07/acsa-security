@@ -126,12 +126,13 @@ class ReachabilityEngine:
             n for n in graph.nodes.values() if n.node_type == "entry_point"
         ]
 
-        # Prioritize routes, http handlers, cli entries, then exported functions
+        # Prioritize concrete routes (POST, GET, etc.), http handlers, cli entries, middleware, then exports
         entry_nodes.sort(
             key=lambda n: (
                 0 if n.properties.get("entry_type") == "route" else
                 1 if n.properties.get("entry_type") == "http_handler" else
-                2 if n.properties.get("entry_type") == "cli_entry" else 3
+                2 if n.properties.get("entry_type") == "cli_entry" else
+                3 if n.properties.get("entry_type") == "middleware" else 4
             )
         )
 
@@ -206,7 +207,7 @@ class ReachabilityEngine:
 
             if node.node_type == "entry_point":
                 loc = f"{node.properties.get('file_path')}:{node.properties.get('line_number')}"
-                entry_point_str = loc
+                entry_point_str = f"{loc} ({node.label})"
                 readable_steps.append(f"{loc} ({node.label})")
 
             elif node.node_type == "source_file":

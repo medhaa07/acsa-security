@@ -1,4 +1,21 @@
-"""Application context analysis, route handlers, entry points, and input feasibility for ACSA.
+"""Context analysis module for evaluating attacker-controlled data flow in ACSA."""
 
-NOTE: Implementation scheduled for Phase 4.
-"""
+from acsa.context.analyzer import ContextAnalyzer
+from acsa.context.models import (
+    AttackerControlStatus,
+    ContextAnalysis,
+    DataFlowStep,
+    InputSource,
+    InputSourceType,
+)
+from acsa.context.service import ContextService
+
+__all__ = [
+    "AttackerControlStatus",
+    "ContextAnalysis",
+    "ContextAnalyzer",
+    "ContextService",
+    "DataFlowStep",
+    "InputSource",
+    "InputSourceType",
+]

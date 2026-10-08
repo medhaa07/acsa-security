@@ -126,6 +126,10 @@ class ReachabilityAnalysis(BaseModel):
         default=None,
         description="Reason for UNKNOWN classification (e.g. dynamic require, missing symbols)",
     )
+    missing_evidence: str | None = Field(
+        default=None,
+        description="Missing evidence needed to resolve reachability, preparing dynamic probe",
+    )
     confidence: float = Field(
         default=0.5,
         ge=0.0,
