@@ -1,193 +1,361 @@
 # ACSA — Artifact-Centric Security Analysis
 
-> **Don't just detect vulnerabilities. Prove their exposure.**
+> **Don't just detect vulnerabilities. Prove their exposure. Find the fix. Verify the result.**
 
-Artifact-Centric Security Analysis (ACSA) is an evidence-driven software supply-chain security platform designed primarily for JavaScript/TypeScript and npm repositories. Instead of stopping at keyword-matching package names or raw CVE counts, ACSA interrogates software artifacts to mathematically and logically prove whether a known vulnerability is actually reachable and exposed to external attacker execution paths.
+ACSA (Artifact-Centric Security Analysis) is a software supply-chain security project focused on JavaScript/TypeScript and npm repositories.
 
----
+Traditional security tools can identify vulnerable dependencies, but a vulnerable package does not automatically mean an application is exposed. The vulnerable code might never be used, might not be included in the deployed application, or might not be reachable through an attacker-controlled input.
 
-## 1. What Is ACSA?
+ACSA aims to investigate whether a vulnerability is relevant to a specific application and, eventually, help developers choose, validate, and verify a suitable remediation.
 
-Modern software development relies heavily on open-source dependencies. However, conventional Software Bill of Materials (SBOM) and Software Composition Analysis (SCA) scanners generate overwhelming volumes of unverified, noisy alerts:
-- A package declared in `package.json` may never be invoked at runtime.
-- A vulnerable function inside a transitive dependency may be dead code or stripped during build optimization (e.g. tree-shaking).
-- Packages declared in `devDependencies` frequently generate high-severity alerts even when omitted from production deployments.
-
-Security and engineering teams suffer from severe alert fatigue, triaging vulnerabilities that present zero real-world risk.
-
-**ACSA's Core Question:**
-> *"Does this vulnerability actually affect this exact software artifact — and what evidence proves it?"*
-
-Rather than relying on basic CVSS severity scores, ACSA synthesizes:
-1. **Manifest Presence**: Was the component declared?
-2. **Artifact Inclusion**: Was the component physically bundled into the deployable artifact?
-3. **Execution Reachability**: Do application entry points and call graphs reach the vulnerable function or symbol?
-4. **Context Feasibility**: Can external or attacker-controlled input reach and trigger the vulnerable execution path?
+Its goal is to move beyond simply reporting vulnerabilities toward **evidence-driven security decisions and verified remediation**.
 
 ---
 
-## 2. Five-Phase Technical Pipeline
+## 1. The Problem We Are Solving
 
-ACSA models the analysis process as an end-to-end evidence pipeline:
+Modern applications depend on many open-source libraries. These dependencies can introduce security vulnerabilities, but not every reported vulnerability represents the same level of risk.
 
-```
-Repository
-    ↓
-Phase 1: Ingestion (Manifest, lockfile, SBOM)
-    ↓
-Phase 2: Inventory Truth & Vulnerability Intelligence (OSV, version applicability)
-    ↓
-Phase 3: Reachability Analysis (AST parsing, import & call graphs)
-    ↓
-Phase 4: Context & Evidence Fusion (Entry points, route feasibility, final verdict)
-    ↓
-Remediation & Proof (Minimum-blast-radius fix, proof-carrying PR)
-```
+For example:
 
-| Phase | Focus | Description |
-| :--- | :--- | :--- |
-| **Phase 0** | **Engineering Foundation** *(Implemented)* | Architecture, canonical domain contracts, verdict vocabulary, security sandboxing, FastAPI service, and Typer CLI. |
-| **Phase 1** | **Ingestion & Inventory Truth** *(Planned)* | Ingestion and normalization of `package.json`, `package-lock.json` (v2/v3), and CycloneDX/SPDX SBOMs. |
-| **Phase 2** | **Truth + Intel** *(Planned)* | Multi-source reconciliation, deterministic OSV advisory querying, and exact semantic version applicability. |
-| **Phase 3** | **Reachability** *(Planned)* | JavaScript/TypeScript AST parsing, import graph resolution, call graph tracing, and vulnerable symbol mapping. |
-| **Phase 4** | **Context + Fusion** *(Planned)* | HTTP entry point and route feasibility, multi-source evidence fusion, verdict emission, and remediation proof. |
+- A vulnerable package may be installed but its vulnerable function may never be called.
+- A transitive dependency may contain vulnerable code that the application does not reach.
+- A development-only dependency may not be included in the production artifact.
+- An automated dependency upgrade may introduce breaking changes or application regressions.
+- A developer may receive a suggested fix but still be unsure whether it is safe to merge.
 
----
+This creates two connected problems:
 
-## 3. Primary Novelty Features
+**Problem 1 — Understanding the actual risk**
 
-ACSA introduces three primary novel capabilities that move security from *"alert and hope"* to *"change, verify, and prove"*:
+Does the vulnerability affect this specific application, and what evidence supports that conclusion?
 
-### 1. Proof-Carrying Remediation
-Traditional automated dependency PRs simply bump package versions without verifying whether the vulnerability was actually eliminated or whether breaking changes were introduced.
-- ACSA embeds a cryptographic **ProofArtifact** directly into remediation pull requests.
-- The PR contains deterministic before-and-after evidence graph fingerprints proving that the application's exposure path was demonstrably severed.
+**Problem 2 — Safely removing the risk**
 
-### 2. Minimum-Blast-Radius Fix
-Rather than blindly jumping to the latest major package release, ACSA calculates the **Minimum-Blast-Radius Fix**:
-- It evaluates multiple candidates (call-site sanitization guards, minimal patch bumps, minor upgrades, major version updates).
-- It selects the smallest verified modification that severs all proven exposure paths while minimizing breaking changes and transitive dependency churn.
+What is the most suitable fix for this application, and how can we verify that the fix addresses the vulnerability without breaking existing functionality?
 
-### 3. Contradiction-Aware Inventory
-Real-world software supply chains often have discrepancies between manifests (`package.json`), lockfiles (`package-lock.json`), build SBOMs, and bundled artifacts.
-- Rather than blindly trusting a single SBOM or manifest, ACSA cross-examines all sources.
-- Discrepancies are captured as structured `Contradiction` records with corresponding `TrustAssessment` scores, preserving conflicts rather than masking them.
+### ACSA's Core Questions
+
+1. What dependencies does the application actually contain?
+2. Which vulnerabilities affect their exact versions?
+3. Can the application reach the vulnerable code?
+4. Can attacker-controlled input reach the vulnerable execution path?
+5. What remediation options are available?
+6. Does the proposed fix address the identified security risk?
+7. What evidence can be provided to help the developer decide whether to accept the fix?
 
 ---
 
-## 4. Supporting Feature: Uncertainty-Guided Dynamic Probe
+## 2. ACSA's Approach
 
-Static analysis cannot always reach a definitive conclusion due to:
-- Dynamic module imports (`import(variable)` / `require(computed)`).
-- Reflection and `eval()`.
-- Complex conditional environment branching.
+ACSA is designed around an evidence-driven workflow:
 
-**Core Philosophy**: `UNKNOWN` is never treated as `SAFE`. When static analysis is inconclusive, ACSA generates an **Uncertainty-Guided Dynamic Probe** that specifies what runtime evidence is needed (such as exercising a specific route with synthetic inputs in an isolated sandbox) to resolve the uncertainty.
+```text
+Repository / Software Artifact
+              |
+              v
+    Inventory and Reconciliation
+              |
+              v
+   Vulnerability Identification
+              |
+              v
+     Exact-Version Applicability
+              |
+              v
+       Code Reachability
+              |
+              v
+   Context and Exposure Analysis
+              |
+              v
+      Evidence-Based Verdict
+              |
+              v
+       Remediation Candidates
+              |
+              v
+       Fix Validation
+              |
+              v
+     Post-Fix Security Analysis
+              |
+              v
+    Evidence for Developer Review
+```
+
+The initial phases establish what is present, what is vulnerable, and what can be proven about exposure. The planned remediation stage will investigate suitable fixes and validate their results before presenting them for developer review.
+
+**Important principle:** A generated fix must not automatically be considered safe or successful merely because it was created.
 
 ---
 
-## 5. Shared Verdict Vocabulary
+## 3. Key Features and Research Direction
 
-ACSA enforces 7 canonical verdicts across the pipeline:
+### 3.1 Contradiction-Aware Inventory
 
-| Verdict | Meaning | Safe? |
-| :--- | :--- | :---: |
-| `PROVEN_EXPOSURE` | Verified proof shows vulnerable code is reachable and exposed to external application execution. | No |
-| `PROVEN_AFFECTED` | Component is bundled in runtime scope; specific symbol path is unconfirmed. | No |
-| `POTENTIALLY_AFFECTED` | Component is declared or resolved; reachability status remains pending. | No |
-| `PROVEN_NOT_AFFECTED` | Verified proof shows vulnerable code is dead, excluded, or neutralized. | **YES** |
-| `UNKNOWN` | Analysis is inconclusive due to missing artifacts or dynamic imports. | **NO** |
-| `CONTRADICTORY` | Unreconciled conflicts exist between manifest, lockfile, and SBOM observations. | No |
-| `NOT_VERIFIED` | Remediation candidate has not yet undergone post-remediation verification. | No |
+ACSA compares multiple sources of dependency information rather than blindly trusting a single source.
 
-> ⚠️ **CRITICAL PRINCIPLE**: **`UNKNOWN` must NEVER automatically mean `SAFE`.** Only `PROVEN_NOT_AFFECTED` constitutes proven safety.
+Potential inputs include:
+
+- `package.json`
+- `package-lock.json`
+- CycloneDX or SPDX Software Bill of Materials (SBOM) files
+- Build or deployment artifact information, where available
+
+For example, if the manifest, lockfile, and SBOM report different versions of the same package, ACSA should preserve the disagreement and identify which information still needs verification.
+
+The objective is to establish a more reliable view of the application's dependencies before making security decisions.
+
+### 3.2 Evidence-Based Reachability Analysis
+
+ACSA aims to determine whether the application can reach a vulnerable function rather than treating every vulnerable dependency as automatically exposed.
+
+The planned JavaScript/TypeScript analysis includes:
+
+- Abstract Syntax Tree (AST) inspection
+- Import and dependency relationship analysis
+- Call-path tracing
+- Vulnerable symbol mapping, where advisory information permits
+- Identification of application entry points
+- Analysis of paths involving potentially attacker-controlled input
+
+Static analysis has limitations, particularly with dynamic imports, reflection, and runtime-dependent behavior. ACSA must preserve these limitations in its results instead of presenting uncertain conclusions as proven facts.
+
+### 3.3 Minimum-Blast-Radius Remediation — Planned
+
+The safest remediation is not necessarily the newest dependency version or the largest possible code change.
+
+ACSA will investigate how to compare remediation candidates based on factors such as:
+
+- Whether the proposed change addresses the identified vulnerability
+- The size and scope of the change
+- Potential breaking changes
+- Changes to transitive dependencies
+- Compatibility with the application's existing code
+- Results from the application's available tests
+- Whether the vulnerable execution path remains reachable
+
+Potential remediation strategies include a dependency upgrade, a smaller compatible version update, an application-code change, a configuration change, or dependency replacement when appropriate.
+
+The objective is to identify a **small, suitable, evidence-supported fix**, rather than blindly upgrading packages.
+
+This feature is a planned research and implementation direction, not a claim that ACSA can currently calculate or guarantee the optimal fix.
+
+### 3.4 Proof-Carrying Remediation — Planned
+
+ACSA will investigate a remediation workflow in which a proposed fix is accompanied by evidence that helps developers evaluate it.
+
+A future remediation report or pull request could include:
+
+- The original vulnerability and affected dependency
+- The evidence connecting the vulnerability to the application
+- The selected remediation and the reason for choosing it
+- The exact files and dependency versions changed
+- Test results before and after the change, where available
+- The results of post-fix vulnerability analysis
+- Whether the previously identified vulnerable path remains reachable
+- Any remaining uncertainty, compatibility concerns, or failed checks
+
+The long-term goal is to create a **proof-carrying remediation**: a proposed change accompanied by reproducible evidence about what was checked and what the checks established.
+
+ACSA must not claim that a vulnerability is fixed merely because a dependency version changed or a test suite passed. Each conclusion must be supported by the corresponding verification evidence.
+
+### 3.5 Uncertainty-Guided Analysis — Planned
+
+Static analysis cannot always establish a definitive answer.
+
+For example, a dependency may be loaded through a dynamic import whose target depends on runtime configuration.
+
+Instead of treating an inconclusive result as safe, ACSA will preserve the `UNKNOWN` verdict and identify the missing evidence.
+
+A future version could suggest additional checks, such as running a relevant route with synthetic inputs in an isolated test environment.
+
+Any dynamic testing must be explicitly scoped and safely isolated. A suggested probe is not proof of exposure or safety until the required evidence has actually been collected and evaluated.
 
 ---
 
-## 6. Implementation Status
+## 4. Verdict Vocabulary
 
-### Currently Implemented (Phase 0 Foundation)
-- [x] **Project Skeleton & Packaging**: Modular architecture configured with `pyproject.toml`, Ruff, mypy, and pytest.
-- [x] **Foundation Domain Models**: Strongly typed Pydantic models for `Repository`, `RepositorySnapshot`, `Component`, `Dependency`, `Evidence`, `EvidenceSource`, `EvidenceNode`, `EvidenceEdge`, `EvidenceGraph`, `Vulnerability`, `Finding`, `Verdict`, `Contradiction`, `TrustAssessment`, `RemediationCandidate`, `RemediationDecision`, `VerificationResult`, and `ProofArtifact`.
-- [x] **Verdict Safety Invariants**: Programmatic validation ensuring `UNKNOWN` never evaluates to safe.
-- [x] **Evidence Graph**: Directed graph supporting BFS reachability, path enumeration, and deterministic cryptographic SHA-256 digests.
-- [x] **FastAPI Service**: Operational backend with `GET /health` operational endpoint (reporting status without mock/fake metrics).
-- [x] **Typer CLI**: Command-line interface with `version`, `status`, and `plan` commands.
-- [x] **Security Sandboxing & Primitives**: Path traversal validation (`validate_safe_path`), workspace isolation (`isolate_workspace`), and secret masking in logs (`SecretMaskingFilter`).
-- [x] **Testing & CI**: Comprehensive unit and integration test suite and GitHub Actions workflow.
+ACSA uses explicit verdicts to distinguish established evidence from unresolved questions.
 
-### Planned for Subsequent Phases (NOT Implemented Yet)
-- [ ] Phase 1: File ingestion parsers for `package.json`, `package-lock.json`, and CycloneDX/SPDX.
-- [ ] Phase 2: Live OSV API integration and deterministic local caching.
-- [ ] Phase 3: JavaScript/TypeScript AST parsing, call graph generation, and vulnerable symbol mapping.
-- [ ] Phase 4: Route handler context feasibility, multi-source evidence fusion engine.
-- [ ] Remediation Engine: Automated patch generation, blast-radius minimization, and GitHub PR creation.
+| Verdict | Meaning |
+|---|---|
+| `PROVEN_EXPOSURE` | Evidence establishes that a relevant vulnerable execution path is exposed through the analyzed application context. |
+| `PROVEN_AFFECTED` | Evidence establishes that the vulnerability affects the analyzed artifact, without necessarily proving external exploitability. |
+| `POTENTIALLY_AFFECTED` | The available evidence indicates a possible impact, but uncertainty remains. |
+| `PROVEN_NOT_AFFECTED` | Sufficient evidence establishes that the analyzed artifact and scope are not affected under the evaluated conditions. |
+| `UNKNOWN` | The available evidence is insufficient to reach a reliable conclusion. |
+| `CONTRADICTORY` | Relevant inventory or analysis sources contain unresolved conflicts. |
+| `NOT_VERIFIED` | A proposed remediation has not completed the required post-fix verification. |
 
----
+> **Critical principle: `UNKNOWN` does not mean `SAFE`.**
 
-## 7. Security Principles & Boundaries
-
-ACSA is designed to safely analyze untrusted third-party code:
-1. **No Frontend Token Exposure**: GitHub App tokens and personal access tokens are never exposed or transmitted to frontend interfaces.
-2. **Zero Secret Logging**: Automated redaction filter (`SecretMaskingFilter`) masks tokens, bearer headers, and credentials from all logs.
-3. **Path Traversal Guards**: Strict resolution prevents path traversal (`validate_safe_path`) and rejects embedded null bytes.
-4. **Workspace Isolation**: Analysis takes place in temporary, isolated directories that are automatically purged after execution.
-5. **Scan Quotas & Timeouts**: Enforces hard file size limits (default: 50MB) and scan execution timeouts (default: 300s).
-6. **No Arbitrary Code Execution**: Target repositories are analyzed declaratively via AST and static models; npm lifecycle scripts (`preinstall`, `postinstall`) are strictly blocked.
+Likewise, a passing test suite alone does not prove that a vulnerability has been eliminated. ACSA must distinguish between tests that passed, security checks that passed, and conclusions that remain unverified.
 
 ---
 
-## 8. Development Setup & Testing
+## 5. Implementation Roadmap
 
-### Prerequisites
-- Python 3.11+
-- Git
+| Phase | Focus | Status |
+|---|---|---|
+| Phase 0 | Engineering foundation, domain models, evidence graph, API, CLI, safety controls, and tests | Implemented |
+| Phase 1 | Manifest, lockfile, and SBOM ingestion and inventory reconciliation | Planned |
+| Phase 2 | Vulnerability intelligence, OSV integration, and version applicability | Planned |
+| Phase 3 | JavaScript/TypeScript reachability analysis | Planned |
+| Phase 4 | Context analysis, evidence fusion, and security verdicts | Planned |
+| Phase 5 | Remediation selection, fix validation, post-fix analysis, and proof-carrying pull requests | Planned |
 
-### Installation
-```bash
-# Clone the repository
-git clone https://github.com/medhaa07/acsa-security.git
-cd acsa-security
+The roadmap separates current implementation from future goals. Each phase must be implemented and tested before its capabilities are presented as operational.
 
-# Install package in editable mode with development dependencies
-pip install -e ".[dev]"
+---
+
+## 6. Planned Remediation Workflow
+
+The remediation stage will investigate the following workflow:
+
+```text
+       Relevant Vulnerability
+                 |
+                 v
+       Identify Possible Fixes
+                 |
+                 v
+       Compare Remediation Options
+                 |
+                 v
+      Select a Suitable Candidate
+                 |
+                 v
+       Apply in an Isolated Workspace
+                 |
+                 v
+       Run Available Application Tests
+                 |
+                 v
+      Re-run Vulnerability Analysis
+                 |
+                 v
+       Re-check Vulnerable Path
+                 |
+                 v
+        Collect Verification Evidence
+                 |
+                 v
+       Generate Reviewable Fix Report
+                 |
+                 v
+      Developer Reviews and Approves
 ```
 
-### Running Tests
-```bash
-python -m pytest
-```
+A candidate that fails required checks should not be presented as a verified fix. If checks are inconclusive, the result should remain unverified and explain what is missing.
 
-### Running Linter and Type Checks
-```bash
-# Check code style and linting
-python -m ruff check .
+### How could this help developers accept fixes?
 
-# Run static type checking
-python -m mypy .
-```
+Rather than asking a developer to trust a generic automated pull request, ACSA aims to provide a reviewable explanation:
 
-### Running the API
-```bash
-uvicorn acsa.api.app:app --host 127.0.0.1 --port 8000
-```
-Verify the health check endpoint:
-```bash
-curl http://127.0.0.1:8000/health
-# Response: {"status":"ok","service":"acsa-api"}
-```
+- Why was this change recommended?
+- Why was this candidate selected over other options?
+- Which files and dependencies changed?
+- Which tests ran, and what were their results?
+- Was the original vulnerability rechecked?
+- Does the previously identified exposure path remain?
+- What risks or uncertainties remain?
 
-### Using the CLI
-```bash
-# Show help
-python -m acsa.cli.main --help
+The intended benefit is to reduce the effort needed to understand and review a proposed security fix. Developer acceptance is a goal to evaluate through real feedback, not something the system can guarantee.
 
-# Show version
-python -m acsa.cli.main version
+---
 
-# Check foundation status
-python -m acsa.cli.main status
+## 7. Technical Architecture
 
-# Display evidence pipeline plan
-python -m acsa.cli.main plan
-```
+The project is being developed with a modular architecture.
+
+- **Language:** Python 3.11+
+- **Target repositories:** JavaScript/TypeScript and npm
+- **API:** FastAPI
+- **CLI:** Typer
+- **Domain models:** Pydantic
+- **Vulnerability intelligence:** Open Source Vulnerabilities (OSV) database/API
+- **Testing:** pytest
+- **Code quality:** Ruff and mypy
+
+The architecture separates repository ingestion, inventory reconciliation, vulnerability analysis, reachability, evidence evaluation, and remediation so that each stage can be tested independently.
+
+### Security Boundaries
+
+ACSA is intended to analyze untrusted third-party repositories safely.
+
+Important safeguards include:
+
+- Keeping credentials out of frontend interfaces
+- Redacting secrets from logs
+- Validating repository paths and preventing path traversal
+- Isolating analysis workspaces
+- Applying file-size limits and execution timeouts
+- Avoiding arbitrary execution of target repository code
+- Blocking npm lifecycle scripts during repository analysis
+
+Any future remediation or test-execution functionality must maintain appropriate isolation and must not execute untrusted code without explicit sandboxing and resource controls.
+
+---
+
+## 8. Current Implementation Status
+
+**Implemented: Phase 0 — Engineering Foundation**
+
+- Project packaging and modular structure
+- Typed domain models for repositories, components, vulnerabilities, findings, verdicts, evidence, contradictions, remediation candidates, verification results, and proof artifacts
+- Verdict safety invariants
+- Directed evidence graph with reachability operations and deterministic SHA-256 digests
+- FastAPI health endpoint
+- Typer CLI commands for version, status, and pipeline plan
+- Path validation and workspace isolation primitives
+- Secret masking in logs
+- Test suite and GitHub Actions workflow
+
+**Planned: Subsequent phases**
+
+- [ ] Phase 1: Parse manifests, lockfiles, and SBOMs.
+- [ ] Phase 2: Integrate OSV and reconcile vulnerability applicability.
+- [ ] Phase 3: Implement JavaScript/TypeScript reachability analysis.
+- [ ] Phase 4: Implement context analysis and evidence-backed verdicts.
+- [ ] Phase 5: Implement remediation selection, isolated fix validation, post-fix security analysis, and reviewable remediation reports or pull requests.
+
+The domain models and foundation primitives support the planned architecture; they do not mean the corresponding end-to-end analysis or remediation capabilities are already implemented.
+
+---
+
+## 9. How We Will Evaluate ACSA
+
+A successful prototype should demonstrate more than the ability to find vulnerabilities.
+
+Planned evaluation criteria include:
+
+1. **Inventory accuracy:** Can ACSA identify and preserve disagreements between dependency sources?
+2. **Reachability accuracy:** Can it distinguish a reachable vulnerable function from one it cannot establish as reachable?
+3. **Uncertainty handling:** Does it preserve inconclusive cases instead of incorrectly marking them safe?
+4. **Remediation suitability:** Does the proposed fix address the specific vulnerability while limiting unnecessary changes?
+5. **Regression checks:** Do the available tests continue to pass after the change?
+6. **Post-fix verification:** Does re-analysis establish that the original vulnerability or exposure path has been addressed?
+7. **Developer usefulness:** Can a developer understand the recommendation and its supporting evidence well enough to review the change?
+
+Results should be measured on a set of reproducible test repositories or deliberately designed benchmark applications. Any claims about reduced alert volume, remediation success, or developer acceptance should be supported by measured results.
+
+---
+
+## 10. Project Vision
+
+ACSA aims to connect vulnerability detection with evidence-driven remediation.
+
+Instead of stopping at a report that says a dependency is vulnerable, the long-term goal is to help answer:
+
+- Does this vulnerability affect my application?
+- What evidence establishes its exposure?
+- What is a suitable way to remove the risk?
+- Did the proposed fix pass the checks we ran?
+- What evidence supports the post-fix conclusion?
+- What still needs human review?
+
+**Our goal is not simply to generate more security alerts or automatically modify dependencies. It is to help developers make safer, better-informed remediation decisions.**
+
+> **ACSA — Don't just detect vulnerabilities. Prove their exposure. Find the fix. Verify the result.**
