@@ -102,8 +102,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div style={{ color: 'var(--color-text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>CANONICAL INVENTORY</div>
             <div style={{ marginTop: '0.2rem' }}>
-              <strong>{Object.keys(scanResult.inventory.components).length}</strong> components
-              {scanResult.inventory.is_contradictory ? (
+              <strong>{Object.keys(scanResult.inventory?.components || {}).length}</strong> components
+              {scanResult.inventory?.is_contradictory ? (
                 <span style={{ color: 'var(--status-amber-text)', marginLeft: '0.35rem' }}>(Contradictory)</span>
               ) : (
                 <span style={{ color: 'var(--status-green-text)', marginLeft: '0.35rem' }}>(Consistent)</span>
@@ -176,14 +176,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     onClick={() => onSelectFinding(finding)}
                   >
                     <td>
-                      <strong>{finding.component.name}</strong>
+                      <strong>{finding.component?.name || 'Unknown'}</strong>
                     </td>
                     <td>
-                      <code className="code-pill">{finding.component.version || 'unknown'}</code>
+                      <code className="code-pill">{finding.component?.version || 'unknown'}</code>
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                        {finding.vulnerability.id}
+                        {finding.vulnerability?.id || 'Unknown Advisory'}
                       </span>
                     </td>
                     <td>

@@ -183,7 +183,7 @@ export const RemediationView: React.FC<RemediationViewProps> = ({
                 </div>
                 <div>
                   <span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.725rem', fontWeight: 600 }}>FILES AFFECTED</span>
-                  <div>{cand.files_changed.length > 0 ? cand.files_changed.join(', ') : 'package.json'}</div>
+                  <div>{cand.files_changed && cand.files_changed.length > 0 ? cand.files_changed.join(', ') : 'package.json'}</div>
                 </div>
               </div>
 

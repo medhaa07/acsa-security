@@ -23,28 +23,32 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
 
   // Generate concise evidence-based explanation for "WHY IT MATTERS"
   const generateWhyItMatters = () => {
+    const compName = component?.name || 'Package';
+    const compVer = component?.version || 'Unresolved';
+    const vulnId = vulnerability?.id || 'Advisory';
+
     if (verdict === 'PROVEN_EXPOSURE') {
       const entry = context?.entry_point || reachability?.entry_point || 'an application HTTP route';
       const input = context?.source?.expression || 'external request parameters';
       const symbol = reachability?.target_symbol || 'the vulnerable routine';
-      return `Proven security exposure: External input from ${input} entering through ${entry} traverses the application call graph to invoke ${symbol} within ${component.name}@${component.version}. This represents an active, reachable security flaw.`;
+      return `Proven security exposure: External input from ${input} entering through ${entry} traverses the application call graph to invoke ${symbol} within ${compName}@${compVer}. This represents an active, reachable security flaw.`;
     }
     if (verdict === 'PROVEN_AFFECTED') {
-      return `Component ${component.name}@${component.version} contains vulnerable code known to match advisory ${vulnerability.id}. It is active in the runtime inventory, though static data flow could not confirm external attacker parameter control.`;
+      return `Component ${compName}@${compVer} contains vulnerable code known to match advisory ${vulnId}. It is active in the runtime inventory, though static data flow could not confirm external attacker parameter control.`;
     }
     if (verdict === 'POTENTIALLY_AFFECTED') {
-      return `Component ${component.name}@${component.version} is declared in dependency manifests and affected by ${vulnerability.id}. Reachability could not be conclusively proven due to unresolved dynamic boundaries.`;
+      return `Component ${compName}@${compVer} is declared in dependency manifests and affected by ${vulnId}. Reachability could not be conclusively proven due to unresolved dynamic boundaries.`;
     }
     if (verdict === 'UNKNOWN') {
       return `Analysis is inconclusive. Dynamic JavaScript language features or missing symbol signatures prevented static verification. UNKNOWN must never be treated as safe.`;
     }
     if (verdict === 'CONTRADICTORY') {
-      return `Conflicting inventory signals detected across package manifest, lockfile, and SBOM observations for ${component.name}. Ground truth cannot be established without reconciling inventory artifacts.`;
+      return `Conflicting inventory signals detected across package manifest, lockfile, and SBOM observations for ${compName}. Ground truth cannot be established without reconciling inventory artifacts.`;
     }
     if (verdict === 'PROVEN_NOT_AFFECTED') {
-      return `Verified safe: Static AST and call graph analysis confirm ${component.name}@${component.version} is not invoked by any application execution paths, or the installed version is outside vulnerable advisory bounds.`;
+      return `Verified safe: Static AST and call graph analysis confirm ${compName}@${compVer} is not invoked by any application execution paths, or the installed version is outside vulnerable advisory bounds.`;
     }
-    return notes || vulnerability.summary;
+    return notes || vulnerability?.summary || 'Security finding evaluated by ACSA supply chain engine.';
   };
 
   return (
@@ -65,15 +69,15 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
               <span style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {component.name}
+                {component?.name || 'Unknown Component'}
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                {vulnerability.id}
+                {vulnerability?.id || 'Unknown Advisory'}
               </span>
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              Installed Version: <strong style={{ color: 'var(--color-text-primary)' }}>{component.version || 'Unresolved'}</strong>
-              {component.is_direct !== undefined && (
+              Installed Version: <strong style={{ color: 'var(--color-text-primary)' }}>{component?.version || 'Unresolved'}</strong>
+              {component?.is_direct !== undefined && (
                 <span style={{ marginLeft: '0.75rem' }}>
                   ({component.is_direct ? 'Direct manifest dependency' : 'Transitive dependency'})
                 </span>
@@ -85,7 +89,7 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
           </div>
         </div>
 
-        {vulnerability.summary && (
+        {vulnerability?.summary && (
           <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '0.75rem' }}>
             {vulnerability.summary}
           </p>
@@ -164,9 +168,10 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
               <div>
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.75rem' }}>UPGRADE TARGET:</span>
                 <div>
-                  <strong>{remediationCandidate.package_name}</strong> {remediationCandidate.current_version} →{' '}
+                  <strong>{remediationCandidate.package_name || remediationCandidate.target_component || 'Target Component'}</strong>{' '}
+                  {remediationCandidate.current_version} →{' '}
                   <strong style={{ color: 'var(--status-green-text)' }}>
-                    {remediationCandidate.target_version || 'Manual review required'}
+                    {remediationCandidate.target_version || remediationCandidate.proposed_version || 'Manual review required'}
                   </strong>
                 </div>
               </div>
@@ -186,7 +191,7 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.75rem' }}>EVIDENCE CONFIDENCE:</span>
                 <div>
                   <span className={`badge ${remediationCandidate.confidence_level === 'HIGH' ? 'badge-green' : remediationCandidate.confidence_level === 'MEDIUM' ? 'badge-amber' : 'badge-gray'}`}>
-                    {remediationCandidate.confidence_level}
+                    {remediationCandidate.confidence_level || 'LOW'}
                   </span>
                 </div>
               </div>

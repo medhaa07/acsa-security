@@ -18,7 +18,7 @@ export const ProofConditionsTable: React.FC<ProofConditionsTableProps> = ({ item
             Proof-Carrying Verification: <code className="code-pill">{item.target_component}</code>
           </h4>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-tertiary)' }}>
-            Strategy: {item.strategy} • Candidate ID: {item.candidate.slice(0, 8)}...
+            Strategy: {item.strategy} • Candidate ID: {item.candidate ? item.candidate.slice(0, 8) : 'Unknown'}...
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -35,12 +35,12 @@ export const ProofConditionsTable: React.FC<ProofConditionsTableProps> = ({ item
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.825rem' }}>
             <div>Version: <strong>{before.version || 'Unresolved'}</strong></div>
-            <div>Advisories: <strong>{before.advisories.length > 0 ? before.advisories.join(', ') : 'None'}</strong></div>
+            <div>Advisories: <strong>{before.advisories && before.advisories.length > 0 ? before.advisories.join(', ') : 'None'}</strong></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               Verdict: <VerdictBadge verdict={before.verdict} size="sm" />
             </div>
             <div>Reachability: <StatusBadge status={before.reachability_status} size="sm" /></div>
-            <div>Exposure Paths: <strong>{before.exposure_paths.length}</strong></div>
+            <div>Exposure Paths: <strong>{before.exposure_paths ? before.exposure_paths.length : 0}</strong></div>
           </div>
         </div>
 
@@ -50,12 +50,12 @@ export const ProofConditionsTable: React.FC<ProofConditionsTableProps> = ({ item
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.825rem' }}>
             <div>Version: <strong>{after.version || 'Unresolved'}</strong></div>
-            <div>Advisories: <strong>{after.advisories.length > 0 ? after.advisories.join(', ') : '0 (Resolved)'}</strong></div>
+            <div>Advisories: <strong>{after.advisories && after.advisories.length > 0 ? after.advisories.join(', ') : '0 (Resolved)'}</strong></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               Verdict: <VerdictBadge verdict={after.verdict} size="sm" />
             </div>
             <div>Reachability: <StatusBadge status={after.reachability_status} size="sm" /></div>
-            <div>Exposure Paths: <strong>{after.exposure_paths.length}</strong></div>
+            <div>Exposure Paths: <strong>{after.exposure_paths ? after.exposure_paths.length : 0}</strong></div>
           </div>
         </div>
       </div>

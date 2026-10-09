@@ -153,14 +153,14 @@ export const App: React.FC = () => {
                 finding={selectedFinding}
                 remediationCandidate={
                   remediationReport?.candidates?.find(
-                    (c) => c.package_name === selectedFinding.component.name || c.target_component === selectedFinding.component.name
+                    (c) => c.package_name === selectedFinding.component?.name || c.target_component === selectedFinding.component?.name
                   ) ||
                   remediationReport?.results
-                    ?.find((r) => r.finding_id === selectedFinding.id || r.package_name === selectedFinding.component.name)
+                    ?.find((r) => r.finding_id === selectedFinding.id || r.package_name === selectedFinding.component?.name)
                     ?.selected_candidate ||
                   remediationReport?.results
-                    ?.find((r) => r.package_name === selectedFinding.component.name)
-                    ?.candidates[0] ||
+                    ?.find((r) => r.package_name === selectedFinding.component?.name)
+                    ?.candidates?.[0] ||
                   null
                 }
                 onBack={handleBackFromDetail}

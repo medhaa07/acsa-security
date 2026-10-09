@@ -50,7 +50,7 @@ export const ProbeSpecificationCard: React.FC<ProbeSpecificationCardProps> = ({ 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
             <span className="badge badge-amber">
               <span className="badge-dot" aria-hidden="true" />
-              <span>{probe.probe_type.replace(/_/g, ' ')}</span>
+              <span>{probe.probe_type?.replace(/_/g, ' ') || 'PROBE'}</span>
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
               Priority #{probe.priority_rank}
@@ -125,7 +125,7 @@ export const ProbeSpecificationCard: React.FC<ProbeSpecificationCardProps> = ({ 
           Enforced Defensive Safety Constraints
         </div>
         <ul style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-          {probe.safety_constraints.map((constraint, idx) => (
+          {(probe.safety_constraints || []).map((constraint, idx) => (
             <li
               key={idx}
               style={{

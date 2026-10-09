@@ -21,7 +21,7 @@ export const ExposurePath: React.FC<ExposurePathProps> = ({ finding }) => {
             return (
               <React.Fragment key={idx}>
                 <div className="exposure-step">
-                  <span className="exposure-step-indicator">{step.step_type.replace(/_/g, ' ')}</span>
+                  <span className="exposure-step-indicator">{step.step_type?.replace(/_/g, ' ') || 'STEP'}</span>
                   <div className="exposure-step-content">
                     <div className="exposure-step-title">{step.expression}</div>
                     {step.description && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)' }}>{step.description}</div>}
@@ -92,7 +92,7 @@ export const ExposurePath: React.FC<ExposurePathProps> = ({ finding }) => {
             <span className="exposure-step-indicator">VULNERABLE SYMBOL</span>
             <div className="exposure-step-content">
               <div className="exposure-step-title">{reachability.target_symbol}</div>
-              <div className="exposure-step-detail">Package: {component.name}</div>
+              <div className="exposure-step-detail">Package: {component?.name || 'Component'}</div>
             </div>
           </div>
         </div>

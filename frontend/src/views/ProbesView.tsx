@@ -26,7 +26,7 @@ export const ProbesView: React.FC<ProbesViewProps> = ({
     );
   }
 
-  if (!probePlan || probePlan.probes.length === 0) {
+  if (!probePlan || !probePlan.probes || probePlan.probes.length === 0) {
     return (
       <div>
         <div className="section-header">
@@ -53,8 +53,8 @@ export const ProbesView: React.FC<ProbesViewProps> = ({
 
   // Filter by selected finding if passed
   const probesToDisplay = selectedFindingId
-    ? probePlan.probes.filter((p) => p.finding_id === selectedFindingId)
-    : probePlan.probes;
+    ? (probePlan.probes || []).filter((p) => p.finding_id === selectedFindingId)
+    : (probePlan.probes || []);
 
   return (
     <div>
@@ -83,9 +83,9 @@ export const ProbesView: React.FC<ProbesViewProps> = ({
 
       {/* Probe Breakdown by Type */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-        {Object.entries(probePlan.probes_by_type).map(([type, count]) => (
+        {Object.entries(probePlan.probes_by_type || {}).map(([type, count]) => (
           <span key={type} className="badge badge-amber">
-            <span>{type.replace(/_/g, ' ')}:</span>
+            <span>{type?.replace(/_/g, ' ') || type}:</span>
             <strong>{count}</strong>
           </span>
         ))}

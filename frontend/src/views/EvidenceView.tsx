@@ -52,7 +52,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
       {/* Simplified High-Level Provenance Chain */}
       {topFinding && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 className="card-title">Canonical Evidence Chain: {topFinding.component.name}</h3>
+          <h3 className="card-title">Canonical Evidence Chain: {topFinding.component?.name || 'Component'}</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
             Linear evidence flow linking repository artifacts to authoritative verdicts:
           </p>
@@ -71,7 +71,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
               <div className="exposure-step">
                 <span className="exposure-step-indicator">COMPONENT</span>
                 <div className="exposure-step-content">
-                  <div className="exposure-step-title">{topFinding.component.name}</div>
+                  <div className="exposure-step-title">{topFinding.component?.name || 'Component'}</div>
                   <div className="exposure-step-detail">Resolved Canonical Inventory</div>
                 </div>
               </div>
@@ -80,7 +80,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
               <div className="exposure-step">
                 <span className="exposure-step-indicator">VERSION</span>
                 <div className="exposure-step-content">
-                  <div className="exposure-step-title">{topFinding.component.version || 'Unresolved'}</div>
+                  <div className="exposure-step-title">{topFinding.component?.version || 'Unresolved'}</div>
                   <div className="exposure-step-detail">Contradiction-Aware Version Evaluation</div>
                 </div>
               </div>
@@ -89,7 +89,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
               <div className="exposure-step">
                 <span className="exposure-step-indicator">ADVISORY</span>
                 <div className="exposure-step-content">
-                  <div className="exposure-step-title">{topFinding.vulnerability.id}</div>
+                  <div className="exposure-step-title">{topFinding.vulnerability?.id || 'Unknown Advisory'}</div>
                   <div className="exposure-step-detail">OSV Live Vulnerability Intelligence</div>
                 </div>
               </div>
@@ -99,7 +99,9 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
                 <span className="exposure-step-indicator">SYMBOL</span>
                 <div className="exposure-step-content">
                   <div className="exposure-step-title">
-                    {topFinding.vulnerability.vulnerable_symbols.length > 0 ? topFinding.vulnerability.vulnerable_symbols.join(', ') : 'Package Scope'}
+                    {topFinding.vulnerability?.vulnerable_symbols && topFinding.vulnerability.vulnerable_symbols.length > 0
+                      ? topFinding.vulnerability.vulnerable_symbols.join(', ')
+                      : 'Package Scope'}
                   </div>
                   <div className="exposure-step-detail">Vulnerable API Surface</div>
                 </div>
@@ -185,7 +187,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
                   onClick={() => setSelectedEvidence(ev)}
                 >
                   <td>
-                    <code className="code-pill">{ev.id.slice(0, 8)}</code>
+                    <code className="code-pill">{ev.id ? ev.id.slice(0, 8) : 'unknown'}</code>
                   </td>
                   <td>
                     <span className="badge badge-gray">{ev.evidence_type}</span>
@@ -197,7 +199,9 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
                     <span style={{ fontSize: '0.825rem' }}>{ev.description}</span>
                   </td>
                   <td>
-                    <span style={{ fontWeight: 600 }}>{(ev.confidence * 100).toFixed(0)}%</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {typeof ev.confidence === 'number' ? `${(ev.confidence * 100).toFixed(0)}%` : 'Not established'}
+                    </span>
                   </td>
                   <td>
                     <button

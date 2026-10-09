@@ -25,9 +25,9 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const comp = f.component.name.toLowerCase();
-        const adv = f.vulnerability.id.toLowerCase();
-        const sym = f.vulnerability.vulnerable_symbols.join(' ').toLowerCase();
+        const comp = (f.component?.name || '').toLowerCase();
+        const adv = (f.vulnerability?.id || '').toLowerCase();
+        const sym = f.vulnerability?.vulnerable_symbols ? f.vulnerability.vulnerable_symbols.join(' ').toLowerCase() : '';
         if (!comp.includes(q) && !adv.includes(q) && !sym.includes(q)) {
           return false;
         }
@@ -67,10 +67,10 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
   const sortedFindings = useMemo(() => {
     return [...filteredFindings].sort((a, b) => {
       if (sortBy === 'component') {
-        return a.component.name.localeCompare(b.component.name);
+        return (a.component?.name || '').localeCompare(b.component?.name || '');
       }
       if (sortBy === 'advisory') {
-        return a.vulnerability.id.localeCompare(b.vulnerability.id);
+        return (a.vulnerability?.id || '').localeCompare(b.vulnerability?.id || '');
       }
       // Priority sorting
       const score = (f: Finding) => {
@@ -221,19 +221,19 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
                 onClick={() => onSelectFinding(finding)}
               >
                 <td>
-                  <strong>{finding.component.name}</strong>
-                  {finding.component.is_direct && (
+                  <strong>{finding.component?.name || 'Unknown'}</strong>
+                  {finding.component?.is_direct && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--color-text-tertiary)', marginLeft: '0.35rem' }}>
                       (direct)
                     </span>
                   )}
                 </td>
                 <td>
-                  <code className="code-pill">{finding.component.version || 'unknown'}</code>
+                  <code className="code-pill">{finding.component?.version || 'unknown'}</code>
                 </td>
                 <td>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {finding.vulnerability.id}
+                    {finding.vulnerability?.id || 'Unknown'}
                   </span>
                 </td>
                 <td>

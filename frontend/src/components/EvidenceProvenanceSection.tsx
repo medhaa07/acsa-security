@@ -73,9 +73,9 @@ export const EvidenceProvenanceSection: React.FC<EvidenceProvenanceSectionProps>
           <div className="accordion-body">
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <li style={{ color: 'var(--status-green-text)', fontWeight: 500 }}>
-                ✓ OSV Advisory match: <strong style={{ color: 'var(--color-text-primary)' }}>{vulnerability.id}</strong>
+                ✓ OSV Advisory match: <strong style={{ color: 'var(--color-text-primary)' }}>{vulnerability?.id || 'Unknown Advisory'}</strong>
               </li>
-              {vulnerability.aliases.length > 0 && (
+              {vulnerability?.aliases && vulnerability.aliases.length > 0 && (
                 <li style={{ color: 'var(--color-text-secondary)' }}>
                   • Canonical aliases: {vulnerability.aliases.join(', ')}
                 </li>
@@ -83,12 +83,12 @@ export const EvidenceProvenanceSection: React.FC<EvidenceProvenanceSectionProps>
               <li style={{ color: 'var(--status-green-text)', fontWeight: 500 }}>
                 ✓ Applicability Status: <strong style={{ color: 'var(--color-text-primary)' }}>{finding.applicability_status}</strong>
               </li>
-              {vulnerability.vulnerable_symbols.length > 0 && (
+              {vulnerability?.vulnerable_symbols && vulnerability.vulnerable_symbols.length > 0 && (
                 <li style={{ color: 'var(--status-green-text)', fontWeight: 500 }}>
                   ✓ Vulnerable symbol identified: <code className="code-pill">{vulnerability.vulnerable_symbols.join(', ')}</code>
                 </li>
               )}
-              {vulnerability.fixed_versions.length > 0 && (
+              {vulnerability?.fixed_versions && vulnerability.fixed_versions.length > 0 && (
                 <li style={{ color: 'var(--color-text-secondary)' }}>
                   • Upstream fixed versions: {vulnerability.fixed_versions.join(', ')}
                 </li>
