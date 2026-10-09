@@ -685,6 +685,76 @@ def verify_remediation_command(
     console.print(table)
 
 
+@app.command(name="probe-plan")
+def probe_plan(
+    repository_path: str = typer.Argument(
+        ...,
+        help="Path to repository workspace to plan dynamic probes for",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Render output in machine-readable JSON format",
+    ),
+) -> None:
+    """Identify missing evidence for UNKNOWN findings and generate targeted dynamic probe specifications."""
+    from pathlib import Path
+
+    from acsa.core.exceptions import PathTraversalError
+    from acsa.core.path_security import validate_safe_path
+    from acsa.probe.report import ProbeReportGenerator
+    from acsa.probe.service import ProbeService
+
+    target_path = Path(repository_path)
+    try:
+        resolved_path = validate_safe_path(target_path, target_path)
+    except PathTraversalError as err:
+        console.print(f"[bold red]Security Error:[/bold red] {err}")
+        raise typer.Exit(code=1) from err
+    except Exception as err:
+        console.print(f"[bold red]Path Error:[/bold red] {err}")
+        raise typer.Exit(code=1) from err
+
+    if not resolved_path.exists() or not resolved_path.is_dir():
+        console.print(
+            f"[bold red]Error:[/bold red] Repository path '{repository_path}' does not exist or is not a directory."
+        )
+        raise typer.Exit(code=1)
+
+    with console.status(
+        "[bold green]Analyzing repository and planning uncertainty-guided dynamic probes...[/bold green]"
+    ):
+        report, _ = ProbeService.plan_probes_for_repository(resolved_path)
+
+    if json_output:
+        console.print_json(report.model_dump_json(indent=2))
+        return
+
+    console.print("\n" + "=" * 60)
+    console.print("[bold cyan]ACSA UNCERTAINTY-GUIDED DYNAMIC PROBE PLANNING[/bold cyan]")
+    console.print("=" * 60)
+    console.print(f"Repository: [cyan]{report.repository_path}[/cyan]")
+    console.print(f"Unknown Findings: [bold]{report.total_unknown_findings}[/bold]")
+    console.print(f"Probes Planned:   [bold]{report.total_probes_generated}[/bold]")
+
+    if not report.probes:
+        console.print("\n[dim]No UNKNOWN findings requiring dynamic probes detected.[/dim]")
+        return
+
+    for probe in report.probes:
+        console.print("\n" + ProbeReportGenerator.render_probe(probe))
+
+    # Summary table
+    table = Table(title="Dynamic Probes Summary by Type")
+    table.add_column("Probe Type", style="cyan")
+    table.add_column("Count", justify="right", style="bold")
+    for pt, count in sorted(report.probes_by_type.items()):
+        table.add_row(pt, str(count))
+    console.print("\n")
+    console.print(table)
+
+
 @app.command(name="plan")
 def pipeline_plan() -> None:
     """Display the end-to-end evidence pipeline roadmap and novelty capabilities."""
