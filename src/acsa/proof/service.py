@@ -20,7 +20,11 @@ from acsa.proof.models import (
 from acsa.proof.snapshot import SnapshotBuilder
 from acsa.proof.verifier import ProofVerifier
 from acsa.reachability.service import ReachabilityService
-from acsa.remediation.models import RemediationCandidate, RemediationStrategy
+from acsa.remediation.models import (
+    CandidateStatus,
+    RemediationCandidate,
+    RemediationStrategy,
+)
 from acsa.remediation.service import RemediationService
 from acsa.verdict.service import EvidenceFusionService
 from acsa.verdict.vocabulary import Verdict
@@ -319,11 +323,39 @@ class RemediationProofService:
         finding_map = {f.id: f for f in scan_result.findings}
 
         for rem_res in rem_report.results:
-            cand = rem_res.selected_candidate
+            cand = None
+            if candidate_id:
+                if rem_res.selected_candidate and (
+                    rem_res.selected_candidate.candidate_id == candidate_id
+                    or rem_res.selected_candidate.package_name == candidate_id
+                ):
+                    cand = rem_res.selected_candidate
+                else:
+                    for c in rem_res.candidates:
+                        if c.candidate_id == candidate_id or c.package_name == candidate_id:
+                            cand = c
+                            break
+            else:
+                cand = rem_res.selected_candidate
+
             if not cand:
                 continue
 
-            if candidate_id and (cand.candidate_id != candidate_id and cand.package_name != candidate_id):
+            # Ineligible candidates must not be processed for verification
+            if (
+                cand.strategy == RemediationStrategy.NO_SAFE_CANDIDATE
+                or cand.status == CandidateStatus.CONTRADICTION_BLOCKED
+                or cand.status == CandidateStatus.NO_SAFE_CANDIDATE
+                or cand.status == CandidateStatus.REJECTED
+                or (not cand.target_version and cand.strategy != RemediationStrategy.REMOVE_DEPENDENCY)
+            ):
+                logger.info(
+                    "Skipping candidate %s (%s): not eligible for automated verification (status=%s, strategy=%s)",
+                    cand.candidate_id,
+                    cand.package_name,
+                    cand.status,
+                    cand.strategy,
+                )
                 continue
 
             target_finding = finding_map.get(rem_res.finding_id)
@@ -350,11 +382,61 @@ class RemediationProofService:
             elif proof.verification_status == VerificationStatus.REMEDIATION_FAILED:
                 failed_count += 1
 
-        summary = (
-            f"Evaluated {len(proof_results)} remediation candidates under {mode.value}. "
-            f"PROVEN_REMEDIATED: {proven_count}, REQUIRES_VERIFICATION: {requires_count}, "
-            f"PARTIALLY_VERIFIED: {partially_count}, REMEDIATION_FAILED: {failed_count}."
+        has_contradictions = (
+            any(
+                c.status == CandidateStatus.CONTRADICTION_BLOCKED
+                for r in rem_report.results
+                for c in r.candidates
+            )
+            or any(r.verdict == Verdict.CONTRADICTORY for r in rem_report.results)
+            or any(f.verdict == Verdict.CONTRADICTORY for f in scan_result.findings)
+            or any(
+                scan_result.inventory.has_version_discrepancy(pkg)
+                for pkg in scan_result.inventory.unique_component_names
+            )
         )
+
+        if proof_results:
+            summary = (
+                f"Evaluated {len(proof_results)} remediation candidates under {mode.value}. "
+                f"PROVEN_REMEDIATED: {proven_count}, REQUIRES_VERIFICATION: {requires_count}, "
+                f"PARTIALLY_VERIFIED: {partially_count}, REMEDIATION_FAILED: {failed_count}."
+            )
+        else:
+            if candidate_id:
+                matched_cand = None
+                for r in rem_report.results:
+                    for c in r.candidates:
+                        if c.candidate_id == candidate_id or c.package_name == candidate_id:
+                            matched_cand = c
+                            break
+                    if matched_cand:
+                        break
+
+                if matched_cand and (
+                    matched_cand.status == CandidateStatus.CONTRADICTION_BLOCKED
+                    or has_contradictions
+                ):
+                    summary = (
+                        f"No eligible remediation candidates verified for '{matched_cand.package_name}'. "
+                        "Contradictory inventory observations detected across manifests and lockfiles "
+                        "block automatic remediation. Manual review is required."
+                    )
+                elif matched_cand:
+                    summary = (
+                        f"Remediation candidate '{matched_cand.package_name}' cannot be verified: "
+                        f"{matched_cand.reason}"
+                    )
+                else:
+                    summary = f"No remediation candidate matching '{candidate_id}' was found for verification."
+            elif has_contradictions:
+                summary = (
+                    "No eligible remediation candidates could be verified. "
+                    "Contradictory inventory observations detected across manifests and lockfiles "
+                    "block automatic remediation. Manual review is required."
+                )
+            else:
+                summary = "No eligible remediation candidates were available for verification."
 
         return RemediationVerificationReport(
             repository_path=str(repo_dir),

@@ -141,6 +141,8 @@ class VerifyRemediationResponse(BaseModel):
     requires_verification_count: int
     failed_count: int
     results: list[ProofVerificationItem]
+    summary: str | None = None
+    warning: str | None = None
 
 
 @router.post(
@@ -203,6 +205,10 @@ async def verify_remediation(request: VerifyRemediationRequest) -> VerifyRemedia
         for p in proof_report.results
     ]
 
+    warning_msg: str | None = (
+        proof_report.summary if proof_report.total_candidates_verified == 0 else None
+    )
+
     return VerifyRemediationResponse(
         repository_path=proof_report.repository_path,
         verification_mode=proof_report.verification_mode.value,
@@ -211,4 +217,6 @@ async def verify_remediation(request: VerifyRemediationRequest) -> VerifyRemedia
         requires_verification_count=proof_report.requires_verification_count,
         failed_count=proof_report.failed_count,
         results=items,
+        summary=proof_report.summary,
+        warning=warning_msg,
     )

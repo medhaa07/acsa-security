@@ -203,7 +203,16 @@ export const EvidenceProvenanceSection: React.FC<EvidenceProvenanceSectionProps>
                 Final Verdict: <strong style={{ color: 'var(--color-text-primary)' }}>{verdict}</strong>
               </li>
               <li>
-                Deterministic Confidence: <strong style={{ color: 'var(--color-text-primary)' }}>{(finding.confidence * 100).toFixed(0)}%</strong>
+                Confidence Level:{' '}
+                <span
+                  className={`badge ${finding.confidence >= 0.8 ? 'badge-green' : finding.confidence >= 0.5 ? 'badge-amber' : 'badge-gray'}`}
+                  style={{ fontSize: '0.75rem', verticalAlign: 'middle' }}
+                >
+                  {finding.confidence >= 0.8 ? 'HIGH' : finding.confidence >= 0.5 ? 'MEDIUM' : 'LOW'}
+                </span>{' '}
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-tertiary)', marginLeft: '0.25rem' }}>
+                  (Qualitative heuristic assessment — uncalibrated score: {(finding.confidence * 100).toFixed(0)}%)
+                </span>
               </li>
               {notes && (
                 <li style={{ marginTop: '0.25rem', color: 'var(--color-text-secondary)' }}>

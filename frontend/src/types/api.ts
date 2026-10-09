@@ -301,6 +301,9 @@ export interface VerifyRemediationResponse {
   requires_verification_count: number;
   failed_count: number;
   results: ProofVerificationItem[];
+  summary?: string | null;
+  warning?: string | null;
+  message?: string | null;
 }
 
 export interface ProbeSpecification {

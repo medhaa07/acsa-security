@@ -34,7 +34,11 @@ export const FindingDetailView: React.FC<FindingDetailViewProps> = ({
       return `Proven security exposure: External input from ${input} entering through ${entry} traverses the application call graph to invoke ${symbol} within ${compName}@${compVer}. This represents an active, reachable security flaw.`;
     }
     if (verdict === 'PROVEN_AFFECTED') {
-      return `Component ${compName}@${compVer} contains vulnerable code known to match advisory ${vulnId}. It is active in the runtime inventory, though static data flow could not confirm external attacker parameter control.`;
+      const symDesc = reachability?.target_symbol ? `vulnerable symbol '${reachability.target_symbol}'` : 'vulnerable routines';
+      const reachText = reachability?.status === 'NOT_REACHABLE'
+        ? ` However, ${symDesc} is proven not reachable in application source code.`
+        : '';
+      return `Component ${compName}@${compVer} installed version is confirmed affected by advisory ${vulnId}.${reachText} Package applicability alone confirms the installed library version, while application exposure remains a separate conclusion. Exploitability is not implied from component applicability alone.`;
     }
     if (verdict === 'POTENTIALLY_AFFECTED') {
       return `Component ${compName}@${compVer} is declared in dependency manifests and affected by ${vulnId}. Reachability could not be conclusively proven due to unresolved dynamic boundaries.`;

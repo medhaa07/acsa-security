@@ -15,8 +15,9 @@ class Verdict(StrEnum):
     reachable, and exposed to external/attacker-controlled application execution paths."""
 
     PROVEN_AFFECTED = "PROVEN_AFFECTED"
-    """The vulnerable component is bundled and active in runtime scope; specific subroutine
-    or symbol reachability path is unconfirmed or not yet fully isolated."""
+    """The installed component version is confirmed affected by an advisory, while application-level
+    exposure remains a separate conclusion (e.g. the vulnerable symbol is uninvoked or proven not
+    reachable in application code). Package applicability alone must NEVER imply application exploitability."""
 
     POTENTIALLY_AFFECTED = "POTENTIALLY_AFFECTED"
     """Dependency is declared or resolved in the graph; reachability status remains pending

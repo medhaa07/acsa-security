@@ -94,3 +94,59 @@ def test_api_scan_not_found() -> None:
         json={"repository_path": "tests/fixtures/does_not_exist_xyz"},
     )
     assert response.status_code == 404
+
+
+def test_scan_semver_ghsa_c2qf_rxjj_qqgw_end_to_end_regression() -> None:
+    """Regression test: complete scan-to-finding response for GHSA-c2qf-rxjj-qqgw in nodegoat.
+
+    Proves that:
+    1. Vulnerable symbols does NOT contain 'the' (must be empty list).
+    2. Reachability is UNKNOWN (not NOT_REACHABLE based on a generic word).
+    3. Reachability target_symbol is None (not 'the').
+    4. Exact version applicability remains AFFECTED.
+    5. Verdict is UNKNOWN (UNKNOWN != SAFE).
+    """
+    response = client.post(
+        "/api/v1/scan",
+        json={"repository_path": "tests/fixtures/nodegoat"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    findings = data.get("findings", [])
+    semver_c2qf_findings = [
+        f
+        for f in findings
+        if f.get("component", {}).get("name") == "semver"
+        and f.get("vulnerability", {}).get("id") == "GHSA-c2qf-rxjj-qqgw"
+    ]
+
+    assert len(semver_c2qf_findings) > 0, "Expected at least one semver GHSA-c2qf-rxjj-qqgw finding in nodegoat"
+
+    # Specifically check semver@5.7.0
+    finding_570 = next(
+        (f for f in semver_c2qf_findings if f.get("component", {}).get("version") == "5.7.0"),
+        None,
+    )
+    assert finding_570 is not None, "semver@5.7.0 finding not found"
+
+    for f in semver_c2qf_findings:
+        vuln = f.get("vulnerability", {})
+        reach = f.get("reachability", {})
+        verdict = f.get("verdict")
+        app_status = f.get("applicability_status")
+
+        # 1. Symbol validation: 'the' must NEVER be treated as a vulnerable symbol
+        assert "the" not in vuln.get("vulnerable_symbols", [])
+        assert vuln.get("vulnerable_symbols") == []
+
+        # 2. Reachability validation: must be UNKNOWN, not NOT_REACHABLE
+        assert reach.get("status") == "UNKNOWN"
+        assert reach.get("target_symbol") is None
+        assert reach.get("target_symbol") != "the"
+
+        # 3. Applicability & Exposure separation: installed version is AFFECTED, but verdict is UNKNOWN
+        assert app_status == "AFFECTED"
+        assert verdict == "UNKNOWN"
+        assert "no usable vulnerable symbol" in (reach.get("uncertainty_reason") or "").lower()
+

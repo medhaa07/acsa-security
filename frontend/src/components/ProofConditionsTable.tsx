@@ -141,14 +141,30 @@ export const ProofConditionsTable: React.FC<ProofConditionsTableProps> = ({ item
       </table>
 
       {/* Uncertainty or Missing Evidence */}
-      {item.uncertainty_reason && (
+      {(item.uncertainty_reason || item.missing_evidence) && (
         <div className="amber-banner" style={{ marginTop: '0.75rem' }}>
-          <strong>Uncertainty Reason:</strong> {item.uncertainty_reason}
+          {item.uncertainty_reason && (
+            <div>
+              <strong>Uncertainty Reason:</strong> {item.uncertainty_reason}
+            </div>
+          )}
           {item.missing_evidence && (
-            <div style={{ marginTop: '0.25rem' }}>
+            <div style={{ marginTop: item.uncertainty_reason ? '0.35rem' : 0 }}>
               <strong>Missing Evidence:</strong> {item.missing_evidence}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Supporting Evidence Chain */}
+      {item.evidence && item.evidence.length > 0 && (
+        <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+          <strong>Supporting Evidence Chain:</strong>{' '}
+          {item.evidence.map((evId, idx) => (
+            <code key={idx} className="code-pill" style={{ marginRight: '0.25rem' }}>
+              {evId}
+            </code>
+          ))}
         </div>
       )}
 

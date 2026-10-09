@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from acsa.core.symbols import is_defensible_symbol
 from acsa.evidence.graph import EvidenceGraph
 from acsa.evidence.models import Evidence
 from acsa.reachability.discovery import SourceDiscovery
@@ -53,11 +54,13 @@ class ReachabilityService:
         local_resolver = LocalModuleResolver(set(discovered_rel_files))
         graph_builder = ReachabilityGraphBuilder(local_resolver)
 
-        # Collect target vulnerable symbols per package
+        # Collect target vulnerable symbols per package (filtering non-defensible prose)
         targets: dict[str, list[str]] = {}
         for f in findings:
             if f.vulnerability.vulnerable_symbols:
-                targets.setdefault(f.component.name, []).extend(f.vulnerability.vulnerable_symbols)
+                valid_syms = [s for s in f.vulnerability.vulnerable_symbols if is_defensible_symbol(s)]
+                if valid_syms:
+                    targets.setdefault(f.component.name, []).extend(valid_syms)
         # Deduplicate
         for k in targets:
             targets[k] = list(dict.fromkeys(targets[k]))

@@ -260,3 +260,62 @@ def test_evidence_graph_complete_provenance_chain() -> None:
     assert graph.has_path(osv_id, verdict_id)
     assert graph.has_path(input_id, verdict_id)
 
+
+def test_missing_symbol_metadata_produces_unknown_verdict() -> None:
+    """Regression test: missing symbol metadata produces UNKNOWN verdict; UNKNOWN != SAFE."""
+    vuln = Vulnerability(id="GHSA-nosym-1", summary="Flaw without symbols", vulnerable_symbols=[])
+    comp = Component(name="semver", version="5.7.0")
+    finding = Finding(
+        vulnerability=vuln,
+        component=comp,
+        source_artifact_path="package-lock.json",
+        applicability_status=ApplicabilityStatus.AFFECTED,
+        evidence_ids=["ev-nosym"],
+        reachability=ReachabilityAnalysis(
+            status=ReachabilityState.UNKNOWN,
+            target_symbol=None,
+            uncertainty_reason="Advisory provides no usable vulnerable symbol/function data",
+            confidence=0.5,
+        ),
+    )
+    inv = CanonicalInventory(components=[comp])
+    engine = EvidenceFusionEngine()
+    fused, _ev, _graph = engine.fuse(inv, [finding])
+
+    assert len(fused) == 1
+    f = fused[0]
+    assert f.verdict == Verdict.UNKNOWN
+    assert f.reachability is not None
+    assert f.reachability.target_symbol is None
+    assert "UNKNOWN != SAFE" in (f.notes or "")
+
+
+def test_affected_but_not_reachable_produces_proven_affected_without_implying_exposure() -> None:
+    """Regression test: affected component with unreachable symbol produces PROVEN_AFFECTED without implying exposure."""
+    vuln = Vulnerability(id="GHSA-unreach-1", summary="Flaw", vulnerable_symbols=["template"])
+    comp = Component(name="lodash", version="4.17.19")
+    finding = Finding(
+        vulnerability=vuln,
+        component=comp,
+        source_artifact_path="package-lock.json",
+        applicability_status=ApplicabilityStatus.AFFECTED,
+        evidence_ids=["ev-unreach"],
+        reachability=ReachabilityAnalysis(
+            status=ReachabilityState.NOT_REACHABLE,
+            target_symbol="template",
+            confidence=0.95,
+        ),
+    )
+    inv = CanonicalInventory(components=[comp])
+    engine = EvidenceFusionEngine()
+    fused, _ev, _graph = engine.fuse(inv, [finding])
+
+    assert len(fused) == 1
+    f = fused[0]
+    assert f.verdict == Verdict.PROVEN_AFFECTED
+    # Must explicitly state installed version affected but not reachable, never implying exposure
+    assert "installed version (4.17.19) is affected" in (f.notes or "")
+    assert "proven not reachable" in (f.notes or "")
+    assert "application exposure is not established" in (f.notes or "")
+
+

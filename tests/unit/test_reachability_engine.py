@@ -198,3 +198,35 @@ def test_unimported_package_is_not_reachable() -> None:
     assert res is not None
     assert res.status == ReachabilityState.NOT_REACHABLE
     assert res.confidence >= 0.9
+
+
+def test_generic_word_symbol_produces_unknown_reachability_not_not_reachable() -> None:
+    """Regression test: when finding has generic word 'the' as vulnerable symbol, reachability is UNKNOWN (not NOT_REACHABLE)."""
+    repo_path = FIXTURES_DIR / "direct_reachable"
+
+    vuln = Vulnerability(
+        id="GHSA-c2qf-rxjj-qqgw",
+        summary="semver Regular Expression Denial of Service",
+        vulnerable_symbols=["the"],  # Simulating stale or bad extraction
+        affected_ranges=["< 5.7.2"],
+    )
+    comp = Component(name="semver", version="5.7.0", ecosystem="npm")
+    finding = Finding(
+        vulnerability=vuln,
+        component=comp,
+        verdict=Verdict.POTENTIALLY_AFFECTED,
+        applicability_status=ApplicabilityStatus.AFFECTED,
+    )
+
+    service = ReachabilityService()
+    findings, _evidence, _graph = service.analyze_findings(repo_path, [finding])
+
+    assert len(findings) == 1
+    res = findings[0].reachability
+    assert res is not None
+    # Crucial assertion: generic word 'the' must NEVER yield NOT_REACHABLE with target_symbol='the'
+    assert res.status == ReachabilityState.UNKNOWN
+    assert res.target_symbol is None
+    assert res.uncertainty_reason is not None
+    assert "no usable vulnerable symbol" in res.uncertainty_reason
+

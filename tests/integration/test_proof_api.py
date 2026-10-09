@@ -103,3 +103,86 @@ def test_api_verify_remediation_mode_b(mock_client_cls: MagicMock) -> None:
     assert item["target_component"] == "lodash"
     assert item["proof_conditions"]["version_closed"] is True
     assert item["verification_status"] == "PROVEN_REMEDIATED"
+
+
+@patch("acsa.vulnerability.service.OSVClient")
+def test_api_verify_remediation_contradictory_inventory_empty_results(mock_client_cls: MagicMock) -> None:
+    """Verify that contradictory inventory produces total_candidates_verified=0 and empty results with warning."""
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.query_batch.return_value = {
+        ("npm", "lodash", "4.17.19"): ["GHSA-29mw-wpgm-hmr9"],
+        ("npm", "lodash", "4.17.21"): ["GHSA-29mw-wpgm-hmr9"],
+    }
+    mock_client.get_vulnerability.return_value = {
+        "id": "GHSA-29mw-wpgm-hmr9",
+        "summary": "Prototype Pollution in lodash",
+        "affected": [
+            {
+                "package": {"name": "lodash", "ecosystem": "npm"},
+                "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "0"}, {"fixed": "4.17.21"}]}],
+            }
+        ],
+    }
+
+    contradictory_repo = FIXTURES_DIR.parent / "repo_contradictory"
+    response = client.post(
+        "/api/v1/remediation/verify",
+        json={"repository_path": str(contradictory_repo), "mode": "MODE_A_SIMULATED"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total_candidates_verified"] == 0
+    assert data["results"] == []
+    assert data["warning"] is not None
+    assert "contradictory" in data["warning"].lower() or "block" in data["warning"].lower()
+
+
+@patch("acsa.vulnerability.service.OSVClient")
+def test_api_verify_remediation_nonexistent_candidate(mock_client_cls: MagicMock) -> None:
+    """Verify requesting an unknown candidate returns total_candidates_verified=0 and informative summary."""
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.query_batch.return_value = {}
+
+    target = FIXTURES_DIR / "confirmed_exposure"
+    response = client.post(
+        "/api/v1/remediation/verify",
+        json={
+            "repository_path": str(target),
+            "candidate_id": "nonexistent-candidate-xyz",
+            "mode": "MODE_A_SIMULATED",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total_candidates_verified"] == 0
+    assert data["results"] == []
+    assert "nonexistent-candidate-xyz" in (data["warning"] or data["summary"])
+
+
+def test_api_verify_remediation_path_security_violation() -> None:
+    """Verify path security violation returns HTTP 400 Bad Request."""
+    response = client.post(
+        "/api/v1/remediation/verify",
+        json={"repository_path": "invalid\x00path", "mode": "MODE_A_SIMULATED"},
+    )
+    assert response.status_code == 400
+    assert "Path security violation" in response.json()["detail"]
+
+
+def test_api_verify_remediation_not_found_directory() -> None:
+    """Verify non-existent repository path returns HTTP 404 Not Found."""
+    response = client.post(
+        "/api/v1/remediation/verify",
+        json={
+            "repository_path": "tests/fixtures/does_not_exist_workspace_12345",
+            "mode": "MODE_A_SIMULATED",
+        },
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()

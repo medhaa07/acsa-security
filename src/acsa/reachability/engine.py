@@ -1,6 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
+from acsa.core.symbols import is_defensible_symbol
 from acsa.evidence.graph import EvidenceGraph
 from acsa.evidence.models import Evidence, EvidenceSource
 from acsa.reachability.local_resolution import LocalModuleResolver
@@ -34,7 +35,9 @@ class ReachabilityEngine:
             Tuple of (ReachabilityAnalysis, list[Evidence])
         """
         pkg_name = finding.component.name
-        vulnerable_symbols = finding.vulnerability.vulnerable_symbols
+        # Sanitize and validate vulnerable symbols: generic words like 'the' must never be accepted
+        raw_symbols = finding.vulnerability.vulnerable_symbols or []
+        vulnerable_symbols = [s for s in raw_symbols if is_defensible_symbol(s)]
 
         # 1. Applicability prerequisite check
         if str(finding.applicability_status) != "AFFECTED":
@@ -49,7 +52,8 @@ class ReachabilityEngine:
             )
 
         # 2. Advisory symbol availability check
-        # Invariant: If the advisory does NOT provide a vulnerable symbol, do not invent one.
+        # Invariant: If the advisory does NOT provide a defensible vulnerable symbol, do not invent one.
+        # Generic words like 'the' or keywords must NEVER be treated as vulnerable symbols.
         # REACHABILITY = UNKNOWN (UNKNOWN != SAFE)
         if not vulnerable_symbols:
             return (

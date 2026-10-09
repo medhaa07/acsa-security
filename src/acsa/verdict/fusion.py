@@ -176,9 +176,11 @@ class EvidenceFusionEngine:
             elif reach and reach.status == ReachabilityState.NOT_REACHABLE:
                 # Vulnerable symbol proven not reachable
                 verdict = Verdict.PROVEN_AFFECTED
+                sym_str = f"vulnerable symbol '{reach.target_symbol}'" if reach.target_symbol else "vulnerable routines"
                 notes = (
-                    f"Component '{finding.component.name}' is bundled and affected, but vulnerable "
-                    f"symbol '{reach.target_symbol or ''}' is proven not reachable in application source code."
+                    f"Component '{finding.component.name}' installed version ({finding.component.version}) is affected by advisory "
+                    f"{finding.vulnerability.id}, but {sym_str} is proven not reachable in application source code. "
+                    "Component applicability confirms installed version vulnerability only; application exposure is not established."
                 )
                 confidence = 0.95
 
