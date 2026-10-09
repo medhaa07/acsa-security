@@ -9,7 +9,11 @@ from acsa.proof.models import VerificationMode, VerificationStatus
 from acsa.proof.service import RemediationProofService
 from acsa.remediation.service import RemediationService
 
-NODEGOAT_PATH = Path(r"C:\Users\MEDHANAYAK\.gemini\antigravity-ide\brain\5e94201a-47d9-4532-b22c-bce95da9ad25\scratch\nodegoat")
+NODEGOAT_PATH = (
+    Path("tests/fixtures/nodegoat")
+    if Path("tests/fixtures/nodegoat").exists()
+    else Path(r"C:\Users\MEDHANAYAK\.gemini\antigravity-ide\brain\5e94201a-47d9-4532-b22c-bce95da9ad25\scratch\nodegoat")
+)
 
 
 @pytest.fixture(scope="module")

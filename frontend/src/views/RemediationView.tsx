@@ -38,11 +38,37 @@ export const RemediationView: React.FC<RemediationViewProps> = ({
     }
   };
 
+  const candidates =
+    remediationReport?.candidates && remediationReport.candidates.length > 0
+      ? remediationReport.candidates
+      : remediationReport?.results
+        ? remediationReport.results.flatMap((r) => (r.selected_candidate ? [r.selected_candidate] : r.candidates))
+        : [];
+
+  const candidatesGenerated =
+    remediationReport?.candidates_generated ?? candidates.length;
+
+  const totalFindingsEvaluated =
+    remediationReport?.total_findings_evaluated ?? remediationReport?.results?.length ?? 0;
+
+  const hasContradictions =
+    (remediationReport?.contradictions_detected ?? 0) > 0 ||
+    (remediationReport?.results?.some((r) => r.verdict === 'CONTRADICTORY') ?? false);
+
+  const requiresLockfileRegen =
+    remediationReport?.lockfile_regeneration_required ??
+    candidates.some(
+      (c) =>
+        c.lockfile_action === 'REGENERATION_REQUIRED' ||
+        c.strategy === 'DIRECT_UPGRADE' ||
+        c.strategy === 'TRANSITIVE_OVERRIDE'
+    );
+
   if (isLoading) {
     return <LoadingState message="Calculating Minimum-Blast-Radius remediation candidates..." subtext="Evaluating dependency relations, advisory resolutions, and safe upgrade boundaries." />;
   }
 
-  if (!remediationReport || remediationReport.candidates.length === 0) {
+  if (!remediationReport || candidates.length === 0) {
     return (
       <div>
         <div className="section-header">
@@ -68,7 +94,7 @@ export const RemediationView: React.FC<RemediationViewProps> = ({
           <div>
             <h2 className="section-title">Minimum-Blast-Radius Remediation</h2>
             <p className="section-subtitle">
-              Generated {remediationReport.candidates_generated} candidate fix{remediationReport.candidates_generated === 1 ? '' : 'es'} across {remediationReport.total_findings_evaluated} evaluated findings
+              Generated {candidatesGenerated} candidate fix{candidatesGenerated === 1 ? '' : 'es'} across {totalFindingsEvaluated} evaluated findings
             </p>
           </div>
           <button
@@ -82,13 +108,13 @@ export const RemediationView: React.FC<RemediationViewProps> = ({
         </div>
       </div>
 
-      {remediationReport.contradictions_detected > 0 && (
+      {hasContradictions && (
         <div className="amber-banner">
           ⚠️ <strong>Contradictory Inventory Observations Detected:</strong> Automated in-place updates are blocked for affected components until manifest and lockfile discrepancies are resolved.
         </div>
       )}
 
-      {remediationReport.lockfile_regeneration_required && (
+      {requiresLockfileRegen && (
         <div className="amber-banner" style={{ background: 'var(--color-bg-base)', border: '1px solid var(--color-border-strong)' }}>
           ℹ️ <strong>Lockfile Notice:</strong> Applying candidates modifies dependency declarations. Complete closure will require lockfile regeneration.
         </div>
@@ -102,7 +128,7 @@ export const RemediationView: React.FC<RemediationViewProps> = ({
 
       {/* Candidates List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {remediationReport.candidates.map((cand) => {
+        {candidates.map((cand) => {
           const isVerifying = verifyingCandidateId === cand.candidate_id;
 
           return (

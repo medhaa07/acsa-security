@@ -109,7 +109,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
               <div className="exposure-step">
                 <span className="exposure-step-indicator">ENTRY POINT</span>
                 <div className="exposure-step-content">
-                  <div className="exposure-step-title">{topFinding.reachability?.entry_point || 'Application Entry Point'}</div>
+                  <div className="exposure-step-title">{topFinding.reachability?.entry_point || 'Not established'}</div>
                   <div className="exposure-step-detail">Phase 3 Static AST Reachability</div>
                 </div>
               </div>
@@ -118,7 +118,7 @@ export const EvidenceView: React.FC<EvidenceViewProps> = ({
               <div className="exposure-step">
                 <span className="exposure-step-indicator">ATTACKER INPUT</span>
                 <div className="exposure-step-content">
-                  <div className="exposure-step-title">{topFinding.context?.source?.expression || 'Context Input Analysis'}</div>
+                  <div className="exposure-step-title">{topFinding.context?.source?.expression || 'Not established'}</div>
                   <div className="exposure-step-detail">Phase 4 Attacker Control Determination</div>
                 </div>
               </div>

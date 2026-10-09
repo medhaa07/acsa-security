@@ -74,6 +74,65 @@ describe('RemediationView Component', () => {
     expect(screen.queryByText(/blast radius score/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/0\.25/)).not.toBeInTheDocument();
   });
+
+  it('renders correctly when backend provides results array format', () => {
+    const backendFormatReport: RemediationReport = {
+      repository_path: 'tests/fixtures/nodegoat',
+      total_findings_evaluated: 1,
+      remediated_findings_count: 1,
+      results: [
+        {
+          finding_id: 'finding-1',
+          package_name: 'lodash',
+          current_version: '4.17.11',
+          verdict: 'UNKNOWN',
+          advisories: ['GHSA-lodash-1'],
+          dependency_relation: 'DIRECT',
+          candidates: [
+            {
+              candidate_id: 'cand-lodash-1',
+              strategy: 'DIRECT_UPGRADE',
+              package_name: 'lodash',
+              current_version: '4.17.11',
+              target_version: '4.17.21',
+              files_changed: ['package.json'],
+              dependencies_affected: ['lodash'],
+              api_impact: 'MINIMAL',
+              version_impact: 'PATCH',
+              closure_status: 'EXPECTED_TO_CLOSE',
+              confidence_level: 'HIGH',
+              lockfile_action: 'REGENERATION_REQUIRED',
+              closed_advisories_count: 1,
+              total_advisories_count: 1,
+              closed_paths_count: 0,
+              total_paths_count: 0,
+              reason: 'Upgrade to patched patch release.',
+              evidence_ids: ['ev-lodash'],
+              preconditions: [],
+              expected_effect: 'Resolves vulnerability',
+              status: 'PROPOSED',
+              simulated_patch: null,
+            },
+          ],
+          selected_candidate: null,
+          blast_radius_explanation: 'Lowest risk patch upgrade.',
+        },
+      ],
+    };
+
+    render(
+      <RemediationView
+        repositoryPath="tests/fixtures/nodegoat"
+        remediationReport={backendFormatReport}
+        onGenerateRemediation={vi.fn()}
+        isLoading={false}
+      />
+    );
+
+    expect(screen.getByText('lodash')).toBeInTheDocument();
+    expect(screen.getByText('4.17.11')).toBeInTheDocument();
+    expect(screen.getByText('4.17.21')).toBeInTheDocument();
+  });
 });
 
 describe('ProofConditionsTable Component', () => {

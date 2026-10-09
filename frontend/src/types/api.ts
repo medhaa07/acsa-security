@@ -42,6 +42,8 @@ export type ClosureStatus =
 
 export type EvidenceConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 
+export type DependencyRelation = 'DIRECT' | 'TRANSITIVE' | 'UNUSED' | 'UNKNOWN';
+
 export type VerificationStatus =
   | 'PROVEN_REMEDIATED'
   | 'REMEDIATION_PARTIALLY_VERIFIED'
@@ -224,16 +226,35 @@ export interface RemediationCandidate {
   simulated_patch: string | null;
 }
 
+export interface RemediationAnalysisResult {
+  finding_id: string;
+  package_name: string;
+  current_version: string;
+  verdict: Verdict;
+  advisories: string[];
+  dependency_relation: DependencyRelation;
+  parent_package?: string | null;
+  candidates: RemediationCandidate[];
+  selected_candidate?: RemediationCandidate | null;
+  verification_spec?: unknown | null;
+  blast_radius_explanation?: string;
+}
+
 export interface RemediationReport {
   repository_path: string;
   total_findings_evaluated: number;
-  candidates_generated: number;
-  contradictions_detected: number;
-  candidates: RemediationCandidate[];
-  manifest_patches: Record<string, string>;
-  lockfile_regeneration_required: boolean;
-  summary: string;
-  created_at: string;
+  remediated_findings_count?: number;
+  results?: RemediationAnalysisResult[];
+  generated_at?: string;
+
+  // Optional fields for UI view compatibility and helper derived properties
+  candidates_generated?: number;
+  contradictions_detected?: number;
+  candidates?: RemediationCandidate[];
+  manifest_patches?: Record<string, string>;
+  lockfile_regeneration_required?: boolean;
+  summary?: string;
+  created_at?: string;
 }
 
 export interface ProofConditions {

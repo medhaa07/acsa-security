@@ -50,7 +50,7 @@ export const RepositoryBar: React.FC<RepositoryBarProps> = ({
           {isScanning ? 'Analyzing...' : 'Scan Repository'}
         </button>
       </form>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '0.775rem', color: 'var(--color-text-tertiary)' }}>Presets:</span>
         <button
           type="button"
@@ -59,7 +59,25 @@ export const RepositoryBar: React.FC<RepositoryBarProps> = ({
           disabled={isScanning}
           title="OWASP NodeGoat real repository test fixture"
         >
-          OWASP NodeGoat
+          NodeGoat (Vulnerable)
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => handleSelectPreset('tests/fixtures/repo_basic')}
+          disabled={isScanning}
+          title="Clean repository test fixture"
+        >
+          Clean Repo
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => handleSelectPreset('tests/fixtures/repo_contradictory')}
+          disabled={isScanning}
+          title="Contradictory manifest/lockfile fixture"
+        >
+          Contradictory Fixture
         </button>
       </div>
     </div>
