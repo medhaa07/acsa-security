@@ -1,0 +1,2 @@
+[console_scripts]
+acsa = acsa.cli.main:app
